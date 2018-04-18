@@ -1,3 +1,7 @@
+#ifndef TASK_MANAGER_H
+#define TASK_MANAGER_H
+
+
 #include <cassert>
 #include <vector>
 #include <condition_variable>
@@ -203,3 +207,6 @@ private:
 	std::vector< void * > m_ThreadLocalStorage;
 
 };
+
+
+#endif // TASK_MANAGER_H
