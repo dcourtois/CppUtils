@@ -17,8 +17,6 @@
 #	endif
 #endif
 
-#if MEMORY_CHECK == 1
-
 #include <unordered_map>
 #include <mutex>
 
@@ -71,7 +69,7 @@ public:
 	//!
 	//! singleton implementation
 	//!
-	inline static MemoryTracker& GetGetInstance(void)
+	inline static MemoryTracker& GetInstance(void)
 	{
 		return s_Instance;
 	}
@@ -220,9 +218,11 @@ private:
 	AllocatedBlockMap m_Chunks;
 
 	//! the global instance
-	MemoryTracker s_Instance;
+	static MemoryTracker s_Instance;
 
 };
+
+#if MEMORY_CHECK == 1
 
 //!
 //! Override of new
@@ -262,23 +262,10 @@ inline void operator delete [] (void * pointer, const char * /* filename */, int
 	free(pointer);
 }
 
-//!
-//! Override of delete
-//!
-inline void operator delete (void * pointer) noexcept
-{
-	MemoryTracker::GetInstance().Untrack(pointer);
-	free(pointer);
-}
-
-//!
-//! Override of delete []
-//!
-inline void operator delete [] (void * pointer) noexcept
-{
-	MemoryTracker::GetInstance().Untrack(pointer);
-	free(pointer);
-}
+// global delete override. These are defined in the #if defined(MEMORY_TRACKER_IMPLEMENTATION)
+// because they cannot be declared as inline.
+void operator delete (void * pointer) noexcept;
+void operator delete [] (void * pointer) noexcept;
 
 #	define MT_NEW						new (__FILE__, __LINE__)
 #	define MT_DELETE					delete
@@ -286,16 +273,6 @@ inline void operator delete [] (void * pointer) noexcept
 #	define MT_BREAK_ON_ALLOC(count)		MemoryTracker::GetInstance().BreakOnAlloc(count)
 #	define MT_DUMP_LEAKS()				MemoryTracker::GetInstance().DumpLeaks()
 #	define MT_GET_ALLOCATED_MEM()		MemoryTracker::GetInstance().GetTrackedMemory()
-
-//!
-//! If @a MEMORY_TRACKER_IMPLEMENTATION is defined, define data.
-//!
-#	if defined(MEMORY_TRACKER_IMPLEMENTATION)
-
-	// the memory tracker instance
-	MemoryTracker MemoryTracker::s_Instance;
-
-#	endif
 
 #else
 
@@ -310,3 +287,36 @@ inline void operator delete [] (void * pointer) noexcept
 
 
 #endif // MEMORY_TRACKER
+
+
+//!
+//! If @a MEMORY_TRACKER_IMPLEMENTATION is defined, define data.
+//!
+#if defined(MEMORY_TRACKER_IMPLEMENTATION)
+
+#	if MEMORY_CHECK == 1
+
+//!
+//! Override of delete
+//!
+void operator delete (void * pointer) noexcept
+{
+	MemoryTracker::GetInstance().Untrack(pointer);
+	free(pointer);
+}
+
+//!
+//! Override of delete []
+//!
+void operator delete [] (void * pointer) noexcept
+{
+	MemoryTracker::GetInstance().Untrack(pointer);
+	free(pointer);
+}
+
+#	endif
+
+// the memory tracker instance
+MemoryTracker MemoryTracker::s_Instance;
+
+#endif
