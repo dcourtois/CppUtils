@@ -54,6 +54,9 @@ namespace Profiler
 	//! Mutex to protect marker vector access
 	extern std::mutex MarkerMutex;
 
+	//! Enabled state
+	extern bool Enabled;
+
 	//!
 	//! Define a scope data
 	//!
@@ -165,12 +168,15 @@ namespace Profiler
 		//!
 		~ProfileScope(void)
 		{
-			AddMarker({
-				m_ScopeID,
-				m_ThreadID,
-				m_Start,
-				GetCurrentTime()
-			});
+			if (Enabled == true)
+			{
+				AddMarker({
+					m_ScopeID,
+					m_ThreadID,
+					m_Start,
+					GetCurrentTime()
+				});
+			}
 		}
 
 	private:
@@ -250,30 +256,27 @@ namespace Profiler
 #	define PROFILE_SCOPE(name)
 #endif
 
-//!
-//! If @a PROFILER_IMPLEMENTATION is defined, define data.
-//!
-#if defined(PROFILER_IMPLEMENTATION)
-
-	//! Main starting point
-	TimePoint Start = GetCurrentTime();
-
-	//! List of scopes
-	std::vector< ScopeData > Scopes;
-
-	//! Scopes protection
-	std::mutex ScopeMutex;
-
-	//! List of markers
-	std::vector< MarkerData > Markers;
-
-	//! Markers protection
-	std::mutex MarkerMutex;
-
-#endif // PROFILER_IMPLEMENTATION
-
 
 } // namespace Profiler
 
 
 #endif // PROFILER_H
+
+//!
+//! If @a PROFILER_IMPLEMENTATION is defined, define data.
+//!
+#if defined(PROFILER_IMPLEMENTATION)
+
+namespace Profiler
+{
+
+	TimePoint Start = GetCurrentTime();
+	std::vector< ScopeData > Scopes;
+	std::mutex ScopeMutex;
+	std::vector< MarkerData > Markers;
+	std::mutex MarkerMutex;
+	bool Enabled;
+
+} // namespace Profiler
+
+#endif // PROFILER_IMPLEMENTATION
