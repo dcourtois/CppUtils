@@ -67,6 +67,26 @@ class MemoryTracker
 public:
 
 	//!
+	//! Define a chunk of tracked memory
+	//! - number of bytes
+	//! - filename
+	//! - line
+	//! - allocation number (can be used with BreakOnAlloc)
+	//!
+	typedef std::tuple<size_t, const char *, int, int64_t> Chunk;
+
+	//!
+	//! Define our custom hash map (using a malloc/free allocator to avoid recursive new)
+	//!
+	typedef std::unordered_map<
+		void *,
+		Chunk,
+		std::hash< void * >,
+		std::equal_to< void * >,
+		Allocator<std::pair< void * const, Chunk > >
+	> AllocatedBlockMap;
+
+	//!
 	//! singleton implementation
 	//!
 	inline static MemoryTracker& GetInstance(void)
@@ -100,48 +120,11 @@ public:
 	}
 
 	//!
-	//! Get the total memory currently allocated through the tracker.
+	//! Get the tracked memory chunks.
 	//!
-	inline size_t  GetTrackedMemory(void)
+	inline AllocatedBlockMap GetTrackedMemory(void) const
 	{
-		size_t allocated = 0;
-		std::lock_guard< std::mutex > lock(m_Mutex);
-		for (const auto & entry : m_Chunks)
-		{
-			allocated += std::get< 0 >(entry.second);
-		}
-		return allocated;
-	}
-
-	//!
-	//! Dumps the memory report.
-	//!
-	//! \note
-	//!		Do not use anything that might use a new or delete operator (std::string, std::stringstream, etc.)
-	//!		because that might lead to our new or delete overload being called.
-	//!
-	inline void DumpLeaks(void)
-	{
-		std::lock_guard< std::mutex > lock(m_Mutex);
-		if (m_Chunks.empty() == true)
-		{
-			printf("No memory leaks, congratulations !\n");
-		}
-		else
-		{
-			printf("Memory leak detected - %llu block%s still allocated :\n", m_Chunks.size(), m_Chunks.size() > 1 ? "s" : "");
-			for (const auto& entry : m_Chunks)
-			{
-				printf(
-					"%s(%d): [%lli] %llu bytes at location %p\n",
-					std::get<1>(entry.second),
-					std::get<2>(entry.second),
-					std::get<3>(entry.second),
-					std::get<0>(entry.second),
-					entry.first
-				);
-			}
-		}
+		return m_Chunks;
 	}
 
 	//!
@@ -149,17 +132,20 @@ public:
 	//!
 	inline void Track(void *pointer, size_t size, const char *filename, int line)
 	{
-		std::lock_guard< std::mutex > lock(m_Mutex);
-
-		// break if the allocation count was set, and it's the current one
-		if (m_BreakOnAlloc == m_AllocationCount)
+		if (m_Enabled == true)
 		{
-			int *dead = nullptr;
-			*dead = 0;
-		}
+			std::lock_guard< std::mutex > lock(m_Mutex);
 
-		// update the chunks
-		m_Chunks.insert(std::make_pair(pointer, Chunk({ size, filename, line, m_AllocationCount++ })));
+			// break if the allocation count was set, and it's the current one
+			if (m_BreakOnAlloc == m_AllocationCount)
+			{
+				int *dead = nullptr;
+				*dead = 0;
+			}
+
+			// update the chunks
+			m_Chunks.insert(std::make_pair(pointer, Chunk({ size, filename, line, m_AllocationCount++ })));
+		}
 	}
 
 	//!
@@ -167,10 +153,14 @@ public:
 	//!
 	inline void Untrack(void *pointer)
 	{
-		std::lock_guard<std::mutex> lock(m_Mutex);
-		auto entry = m_Chunks.find(pointer);
-		if (entry != m_Chunks.end()) {
-			m_Chunks.erase(entry);
+		if (m_Enabled == true)
+		{
+			std::lock_guard<std::mutex> lock(m_Mutex);
+			auto entry = m_Chunks.find(pointer);
+			if (entry != m_Chunks.end())
+			{
+				m_Chunks.erase(entry);
+			}
 		}
 	}
 
@@ -182,28 +172,9 @@ private:
 	MemoryTracker(void)
 		: m_AllocationCount(0)
 		, m_BreakOnAlloc(-1)
+		, m_Enabled(true)
 	{
 	}
-
-	//!
-	//! Define a chunk of tracked memory
-	//! - number of bytes
-	//! - filename
-	//! - line
-	//! - allocation number (can be used with BreakOnAlloc)
-	//!
-	typedef std::tuple<size_t, const char *, int, int64_t> Chunk;
-
-	//!
-	//! Define our custom hash map (using a malloc/free allocator to avoid recursive new)
-	//!
-	typedef std::unordered_map<
-		void *,
-		Chunk,
-		std::hash< void * >,
-		std::equal_to< void * >,
-		Allocator<std::pair< void * const, Chunk > >
-	> AllocatedBlockMap;
 
 	//! mutex used to protect multithreaded access
 	std::mutex m_Mutex;
@@ -216,6 +187,9 @@ private:
 
 	//! our allocated chunks
 	AllocatedBlockMap m_Chunks;
+
+	//! enable the tracking
+	bool m_Enabled;
 
 	//! the global instance
 	static MemoryTracker s_Instance;
@@ -271,7 +245,6 @@ void operator delete [] (void * pointer) noexcept;
 #	define MT_DELETE					delete
 #	define MT_INIT_MEM_TRACKER()		MemoryTracker::GetInstance().Clear()
 #	define MT_BREAK_ON_ALLOC(count)		MemoryTracker::GetInstance().BreakOnAlloc(count)
-#	define MT_DUMP_LEAKS()				MemoryTracker::GetInstance().DumpLeaks()
 #	define MT_GET_ALLOCATED_MEM()		MemoryTracker::GetInstance().GetTrackedMemory()
 
 #else
@@ -280,7 +253,6 @@ void operator delete [] (void * pointer) noexcept;
 #	define MT_DELETE					delete
 #	define MT_INIT_MEM_TRACKER()		(void)0
 #	define MT_BREAK_ON_ALLOC(count)		(void)0
-#	define MT_DUMP_LEAKS()				(void)0
 #	define MT_GET_ALLOCATED_MEM()		0
 
 #endif
