@@ -130,6 +130,14 @@ namespace Profiler
 	}
 
 	//!
+	//! Get the time elapsed between 2 time points in nanoseconds
+	//!
+	inline int64_t GetNanoSeconds(TimePoint start, TimePoint end)
+	{
+		return std::chrono::duration_cast< std::chrono::nanoseconds >(end - start).count();
+	}
+
+	//!
 	//! Get the time elapsed between 2 time points in microseconds
 	//!
 	inline int64_t GetMicroSeconds(TimePoint start, TimePoint end)
