@@ -144,7 +144,7 @@ public:
 			}
 
 			// update the chunks
-			m_Chunks.insert(std::make_pair(pointer, Chunk({ size, filename, line, m_AllocationCount++ })));
+			m_Chunks.insert(std::make_pair(pointer, Chunk(size, filename, line, m_AllocationCount++)));
 		}
 	}
 
