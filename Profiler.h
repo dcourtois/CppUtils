@@ -10,9 +10,6 @@
 #endif
 
 
-#if PROFILER_ENABLE == 1
-
-
 #include <chrono>
 #include <mutex>
 #include <string>
@@ -196,6 +193,11 @@ namespace Profiler
 
 	};
 
+} // namespace Profiler
+
+
+#if PROFILER_ENABLE == 1
+
 
 //!
 //! @def BEGIN_PROFILE(id)
@@ -249,6 +251,8 @@ namespace Profiler
 //!
 #define PRIVATE_MERGE(a, b) PRIVATE_MERGE_2(a, b)
 
+#include "ProfilerOutput.h"
+
 #else
 
 #	define BEGIN_PROFILE(id)		(void)0
@@ -257,11 +261,6 @@ namespace Profiler
 #	define PROFILE_SCOPE(name)		(void)0
 
 #endif
-
-
-} // namespace Profiler
-
-#include "ProfilerOutput.h"
 
 #endif // PROFILER_H
 
