@@ -2,12 +2,13 @@
 #define PROFILER_OUTPUT_H
 
 
+#if PROFILER_ENABLE == 1
+
+
 #include <string>
 #include <mutex>
 #include <fstream>
 #include <algorithm>
-
-#include "./Profiler.h"
 
 
 namespace Profiler
@@ -21,7 +22,7 @@ namespace Profiler
 		//!
 		//! See Trace Event Format : https://docs.google.com/document/d/1CvAClvFfyA5R-PhYUmn5OOQtYMH4h6I0nSsKchNAySU/preview
 		//!
-		void ChromeTracing(const std::string & filename)
+		inline void ChromeTracing(const std::string & filename)
 		{
 			// first, ensure that nobody else is modifying the profiling data
 			std::lock_guard< std::mutex > lockMarkers(MarkerMutex);
@@ -63,5 +64,7 @@ namespace Profiler
 	} // namespace Output
 } // namespace Profiler
 
+
+#endif // PROFILER_ENABLE == 1
 
 #endif // PROFILER_OUTPUT_H

@@ -1,14 +1,6 @@
 #ifndef PROFILER_H
 #define PROFILER_H
 
-
-#include <chrono>
-#include <mutex>
-#include <string>
-#include <thread>
-#include <vector>
-
-
 //!
 //! Use @a PROFILER_ENABLE to explicitely enable or disable the profiling macros.
 //! If not defined by the user, we will define it to 1
@@ -16,6 +8,16 @@
 #if !defined(PROFILER_ENABLE)
 #	define PROFILER_ENABLE 1
 #endif
+
+
+#if PROFILER_ENABLE == 1
+
+
+#include <chrono>
+#include <mutex>
+#include <string>
+#include <thread>
+#include <vector>
 
 
 //!
@@ -53,9 +55,6 @@ namespace Profiler
 
 	//! Mutex to protect marker vector access
 	extern std::mutex MarkerMutex;
-
-	//! Enabled state
-	extern bool Enabled;
 
 	//!
 	//! Define a scope data
@@ -176,15 +175,12 @@ namespace Profiler
 		//!
 		~ProfileScope(void)
 		{
-			if (Enabled == true)
-			{
-				AddMarker({
-					m_ScopeID,
-					m_ThreadID,
-					m_Start,
-					GetCurrentTime()
-				});
-			}
+			AddMarker({
+				m_ScopeID,
+				m_ThreadID,
+				m_Start,
+				GetCurrentTime()
+			});
 		}
 
 	private:
@@ -200,80 +196,80 @@ namespace Profiler
 
 	};
 
-//
-// Define profiling macros
-//
-#if PROFILER_ENABLE == 1
 
-	//!
-	//! @def BEGIN_PROFILE(id)
-	//!
-	//! This macro is used with #END_PROFILE(id) to profile a specific piece of code.
-	//!
-#	define BEGIN_PROFILE(id)																			\
-		static const std::size_t _scope_id_##id = Profiler::RegisterScope(#id, __FILE__, __LINE__);		\
-		Profiler::ThreadID _thread_id_##id = Profiler::GetCurrentThreadID();							\
-		Profiler::TimePoint _start_##id = Profiler::GetCurrentTime();
+//!
+//! @def BEGIN_PROFILE(id)
+//!
+//! This macro is used with #END_PROFILE(id) to profile a specific piece of code.
+//!
+#define BEGIN_PROFILE(id)																			\
+	static const std::size_t _scope_id_##id = Profiler::RegisterScope(#id, __FILE__, __LINE__);		\
+	Profiler::ThreadID _thread_id_##id = Profiler::GetCurrentThreadID();							\
+	Profiler::TimePoint _start_##id = Profiler::GetCurrentTime();
 
-	//!
-	//! @def END_PROFILE(id)
-	//!
-	//! Used with #BEGIN_PROFILE(id) to profile a specific piece of code.
-	//!
-#	define END_PROFILE(id)				\
-		Profiler::AddMarker({			\
-			_scope_id_##id,				\
-			_thread_id_##id,			\
-			_start_##id,				\
-			Profiler::GetCurrentTime()	\
-		})
+//!
+//! @def END_PROFILE(id)
+//!
+//! Used with #BEGIN_PROFILE(id) to profile a specific piece of code.
+//!
+#define END_PROFILE(id)				\
+	Profiler::AddMarker({			\
+		_scope_id_##id,				\
+		_thread_id_##id,			\
+		_start_##id,				\
+		Profiler::GetCurrentTime()	\
+	})
 
-	//!
-	//! @def PROFILE_FUNCTION
-	//!
-	//! Use this macro at the begining of a function to profile it.
-	//!
-	//! @see #PROFILE_SCOPE
-	//!
-#	define PROFILE_FUNCTION() PROFILE_SCOPE(__func__)
+//!
+//! @def PROFILE_FUNCTION
+//!
+//! Use this macro at the begining of a function to profile it.
+//!
+//! @see #PROFILE_SCOPE
+//!
+#define PROFILE_FUNCTION() PROFILE_SCOPE(__func__)
 
-	//!
-	//! @def PROFILE_SCOPE
-	//!
-	//! Profile the current scope : will profile what happens between the
-	//! use of this macro and the end of the scope it was used in.
-	//!
-#	define PROFILE_SCOPE(name)																								\
-		static const std::size_t PRIVATE_MERGE(_scope_id_, __LINE__) = Profiler::RegisterScope(name, __FILE__, __LINE__);	\
-		Profiler::ProfileScope PRIVATE_MERGE(_profile_, __LINE__)(PRIVATE_MERGE(_scope_id_, __LINE__))
+//!
+//! @def PROFILE_SCOPE
+//!
+//! Profile the current scope : will profile what happens between the
+//! use of this macro and the end of the scope it was used in.
+//!
+#define PROFILE_SCOPE(name)																								\
+	static const std::size_t PRIVATE_MERGE(_scope_id_, __LINE__) = Profiler::RegisterScope(name, __FILE__, __LINE__);	\
+	Profiler::ProfileScope PRIVATE_MERGE(_profile_, __LINE__)(PRIVATE_MERGE(_scope_id_, __LINE__))
 
-	//!
-	//! Private macro used to merge 2 values.
-	//!
-#	define PRIVATE_MERGE_2(a, b) a##b
+//!
+//! Private macro used to merge 2 values.
+//!
+#define PRIVATE_MERGE_2(a, b) a##b
 
-	//!
-	//! Private macro used to merge 2 values. See #PRIVATE_MERGE_2
-	//!
-#	define PRIVATE_MERGE(a, b) PRIVATE_MERGE_2(a, b)
+//!
+//! Private macro used to merge 2 values. See #PRIVATE_MERGE_2
+//!
+#define PRIVATE_MERGE(a, b) PRIVATE_MERGE_2(a, b)
 
 #else
-#	define BEGIN_PROFILE(id)
-#	define END_PROFILE(id)
-#	define PROFILE_FUNCTION()
-#	define PROFILE_SCOPE(name)
+
+#	define BEGIN_PROFILE(id)		(void)0
+#	define END_PROFILE(id)			(void)0
+#	define PROFILE_FUNCTION()		(void)0
+#	define PROFILE_SCOPE(name)		(void)0
+
 #endif
 
 
 } // namespace Profiler
 
+#include "ProfilerOutput.h"
 
 #endif // PROFILER_H
+
 
 //!
 //! If @a PROFILER_IMPLEMENTATION is defined, define data.
 //!
-#if defined(PROFILER_IMPLEMENTATION)
+#if defined(PROFILER_IMPLEMENTATION) && PROFILER_ENABLE == 1
 
 namespace Profiler
 {
@@ -283,7 +279,6 @@ namespace Profiler
 	std::mutex ScopeMutex;
 	std::vector< MarkerData > Markers;
 	std::mutex MarkerMutex;
-	bool Enabled;
 
 } // namespace Profiler
 
