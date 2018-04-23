@@ -17,8 +17,14 @@
 #	endif
 #endif
 
+
+
+#if MEMORY_CHECK == 1
+
+
 #include <unordered_map>
 #include <mutex>
+
 
 //!
 //! Allocator used with our hash map to avoid recursive locks
@@ -95,6 +101,22 @@ public:
 	}
 
 	//!
+	//! Enable/Disable memory tracking
+	//!
+	inline static void SetEnabled(bool enabled)
+	{
+		s_Enabled = enabled;
+	}
+
+	//!
+	//! Check if the tracker is enabled
+	//!
+	inline static bool IsEnabled(void)
+	{
+		return s_Enabled;
+	}
+
+	//!
 	//! Reset everything
 	//!
 	inline void Clear(void)
@@ -120,10 +142,25 @@ public:
 	}
 
 	//!
+	//! Get the tracked memory size in bytes.
+	//!
+	inline uint64_t GetTrackedMemory(void)
+	{
+		std::lock_guard< std::mutex > lock(m_Mutex);
+		uint64_t size = 0;
+		for (const auto & chunk : m_Chunks)
+		{
+			size += std::get< 0 >(chunk.second);
+		}
+		return size;
+	}
+
+	//!
 	//! Get the tracked memory chunks.
 	//!
-	inline AllocatedBlockMap GetTrackedMemory(void) const
+	inline AllocatedBlockMap GetTrackedChunks(void)
 	{
+		std::lock_guard< std::mutex > lock(m_Mutex);
 		return m_Chunks;
 	}
 
@@ -132,7 +169,7 @@ public:
 	//!
 	inline void Track(void *pointer, size_t size, const char *filename, int line)
 	{
-		if (m_Enabled == true)
+		if (s_Enabled == true)
 		{
 			std::lock_guard< std::mutex > lock(m_Mutex);
 
@@ -153,7 +190,7 @@ public:
 	//!
 	inline void Untrack(void *pointer)
 	{
-		if (m_Enabled == true)
+		if (s_Enabled == true)
 		{
 			std::lock_guard<std::mutex> lock(m_Mutex);
 			auto entry = m_Chunks.find(pointer);
@@ -172,8 +209,15 @@ private:
 	MemoryTracker(void)
 		: m_AllocationCount(0)
 		, m_BreakOnAlloc(-1)
-		, m_Enabled(true)
 	{
+	}
+
+	//!
+	//! Destructor
+	//!
+	~MemoryTracker(void)
+	{
+		s_Enabled = false;
 	}
 
 	//! mutex used to protect multithreaded access
@@ -189,14 +233,12 @@ private:
 	AllocatedBlockMap m_Chunks;
 
 	//! enable the tracking
-	bool m_Enabled;
+	static bool s_Enabled;
 
 	//! the global instance
 	static MemoryTracker s_Instance;
 
 };
-
-#if MEMORY_CHECK == 1
 
 //!
 //! Override of new
@@ -236,24 +278,67 @@ inline void operator delete [] (void * pointer, const char * /* filename */, int
 	free(pointer);
 }
 
-// global delete override. These are defined in the #if defined(MEMORY_TRACKER_IMPLEMENTATION)
-// because they cannot be declared as inline.
-void operator delete (void * pointer) noexcept;
-void operator delete [] (void * pointer) noexcept;
+//
+// override delete, but this cannot be done inline
+//
+void operator delete (void * pointer);
+void operator delete [] (void * pointer);
 
-#	define MT_NEW						new (__FILE__, __LINE__)
-#	define MT_DELETE					delete
-#	define MT_INIT_MEM_TRACKER()		MemoryTracker::GetInstance().Clear()
-#	define MT_BREAK_ON_ALLOC(count)		MemoryTracker::GetInstance().BreakOnAlloc(count)
-#	define MT_GET_ALLOCATED_MEM()		MemoryTracker::GetInstance().GetTrackedMemory()
+
+//!
+//! @def MT_NEW
+//!		Use instead of `new` to track the allocated chunk of memory. Use @a MT_DELETE
+//!		to release memory allocated through @MT_NEW.
+//!
+#define MT_NEW new (__FILE__, __LINE__)
+
+//!
+//! @def MT_DELETE
+//!		Use instead of `delete` to release memory allocated through through @MT_NEW.
+//!
+#define MT_DELETE delete
+
+//!
+//! @def MT_SET_ENABLED(enabled)
+//!		Use this macro to enable/disable memory tracking.
+//!
+#define MT_SET_ENABLED(enabled) MemoryTracker::GetInstance().SetEnabled(enabled)
+
+//!
+//! @def MT_INIT_MEM_TRACKER
+//!		This will reset all tracked memory. This can be used to avoid tracking statically
+//!		allocated stuff.
+//!
+#define MT_INIT_MEM_TRACKER() MemoryTracker::GetInstance().Clear()
+
+//!
+//! @def MT_BREAK_ON_ALLOC(count)
+//!		Use this macro to tell the memory tracker to break when it reaches @p count
+//!		allocation.
+//!
+#define MT_BREAK_ON_ALLOC(count) MemoryTracker::GetInstance().BreakOnAlloc(count)
+
+//!
+//! @def MT_GET_ALLOCATED_MEMORY
+//!		Get the currently tracked allocated memory in bytes.
+//!
+#define MT_GET_ALLOCATED_MEMORY() MemoryTracker::GetInstance().GetTrackedMemory()
+
+//!
+//! @def MT_GET_ALLOCATED_CHUNKS
+//!		Get the currently allocated chunks of memory.
+//!
+#define MT_GET_ALLOCATED_CHUNKS() MemoryTracker::GetInstance().GetTrackedChunks()
 
 #else
 
 #	define MT_NEW						new
 #	define MT_DELETE					delete
+#	define MT_SET_ENABLED(enabled)		(void)0
 #	define MT_INIT_MEM_TRACKER()		(void)0
 #	define MT_BREAK_ON_ALLOC(count)		(void)0
-#	define MT_GET_ALLOCATED_MEM()		0
+#	define MT_GET_ALLOCATED_MEMORY()	0
+#	define MT_GET_ALLOCATED_CHUNKS()	0
 
 #endif
 
@@ -264,31 +349,28 @@ void operator delete [] (void * pointer) noexcept;
 //!
 //! If @a MEMORY_TRACKER_IMPLEMENTATION is defined, define data.
 //!
-#if defined(MEMORY_TRACKER_IMPLEMENTATION)
-
-#	if MEMORY_CHECK == 1
+#if defined(MEMORY_TRACKER_IMPLEMENTATION) && MEMORY_CHECK == 1
 
 //!
-//! Override of delete
+//! Override the delete operator
 //!
-void operator delete (void * pointer) noexcept
+void operator delete (void * pointer)
 {
 	MemoryTracker::GetInstance().Untrack(pointer);
 	free(pointer);
 }
 
 //!
-//! Override of delete []
+//! Override the delete array operator
 //!
-void operator delete [] (void * pointer) noexcept
+void operator delete [] (void * pointer)
 {
 	MemoryTracker::GetInstance().Untrack(pointer);
 	free(pointer);
 }
-
-#	endif
 
 // the memory tracker instance
-MemoryTracker MemoryTracker::s_Instance;
+MemoryTracker	MemoryTracker::s_Instance;
+bool			MemoryTracker::s_Enabled = true;
 
 #endif
