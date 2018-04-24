@@ -281,8 +281,8 @@ inline void operator delete [] (void * pointer, const char * /* filename */, int
 //
 // override delete, but this cannot be done inline
 //
-void operator delete (void * pointer);
-void operator delete [] (void * pointer);
+void operator delete (void * pointer) noexcept;
+void operator delete [] (void * pointer) noexcept;
 
 
 //!
@@ -354,7 +354,7 @@ void operator delete [] (void * pointer);
 //!
 //! Override the delete operator
 //!
-void operator delete (void * pointer)
+void operator delete (void * pointer) noexcept
 {
 	MemoryTracker::GetInstance().Untrack(pointer);
 	free(pointer);
@@ -363,7 +363,7 @@ void operator delete (void * pointer)
 //!
 //! Override the delete array operator
 //!
-void operator delete [] (void * pointer)
+void operator delete [] (void * pointer) noexcept
 {
 	MemoryTracker::GetInstance().Untrack(pointer);
 	free(pointer);
