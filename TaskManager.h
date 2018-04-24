@@ -2,13 +2,14 @@
 #define TASK_MANAGER_H
 
 
-#include <cassert>
-#include <vector>
-#include <condition_variable>
-#include <queue>
 #include <atomic>
-#include <thread>
+#include <cassert>
+#include <chrono>
+#include <condition_variable>
 #include <mutex>
+#include <queue>
+#include <thread>
+#include <vector>
 
 
 //!
@@ -35,6 +36,7 @@ public:
 	//!
 	TaskManager(int threadCount = -1)
 		: m_Stop(false)
+		, m_TaskCount(0)
 	{
 		// get the number of threads supported by the platform if no threadCount
 		// was provided.
@@ -67,7 +69,7 @@ public:
 						// and wait for something to do (we use a predicate to only wait
 						// if the task manager has not been stopped)
 						std::unique_lock< std::mutex > uniqueLock(m_ConditionVariableMutex);
-						m_ConditionVariable.wait(uniqueLock, [&] (void) -> bool { return m_Stop.load() == false; });
+						m_ConditionVariable.wait(uniqueLock);
 
 						// once activated, we want to go back to the beginning of the loop
 						// to lock again the queue's mutex and check the queue, etc.
@@ -82,6 +84,9 @@ public:
 
 						// and execute it
 						task(m_ThreadLocalStorage[i]);
+
+						// when done executing, decrease the task count
+						--m_TaskCount;
 					}
 				}
 			}));
@@ -157,6 +162,7 @@ public:
 			{
 				std::lock_guard< std::mutex > lock(m_QueueMutex);
 				m_Queue.emplace(task);
+				++m_TaskCount;
 			}
 
 			// and notify one thread that we have a job to do
@@ -183,6 +189,38 @@ public:
 		return static_cast< int >(m_Threads.size());
 	}
 
+	//!
+	//! Wait until there is no longer any task queued. This will stall the current
+	//! thread.
+	//!
+	inline void Wait(void)
+	{
+		while (m_TaskCount > 0)
+		{
+			std::this_thread::sleep_for(std::chrono::milliseconds(1));
+		}
+	}
+
+	//!
+	//! Cancel every queued tasks and stalls the current thread until the currently
+	//! running ones are completed.
+	//!
+	inline void Cancel(void)
+	{
+		// clear the queue task
+		{
+			std::lock_guard< std::mutex > lock(m_QueueMutex);
+			while (m_Queue.empty() == false)
+			{
+				m_Queue.pop();
+				--m_TaskCount;
+			}
+		}
+
+		// and wait for running ones
+		this->Wait();
+	}
+
 private:
 
 	//! The list of threads
@@ -205,6 +243,9 @@ private:
 
 	//! Fake thread local storage
 	std::vector< void * > m_ThreadLocalStorage;
+
+	//! Number of tasks in the queue + running ones
+	std::atomic_int m_TaskCount;
 
 };
 
