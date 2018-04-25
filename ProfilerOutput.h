@@ -17,6 +17,57 @@ namespace Profiler
 	{
 
 		//!
+		//! Generic binary write
+		//!
+		inline void Write(std::ofstream & file, const void * data, size_t size)
+		{
+			file.write(reinterpret_cast< const char * >(data), size);
+		}
+
+		//!
+		//! Utility to write binary values
+		//!
+		template< typename T > inline void Write(std::ofstream & file, const T & data)
+		{
+			file.write(reinterpret_cast< const char * >(&data), sizeof(T));
+		}
+
+		//!
+		//! Override for strings
+		//!
+		template<> inline void Write(std::ofstream & file, const std::string & data)
+		{
+			Write(file, data.size());
+			file.write(data.data(), data.size());
+		}
+
+		//!
+		//! Raw output
+		//!
+		inline void Raw(const std::string & filename)
+		{
+			// first, ensure that nobody else is modifying the profiling data
+			std::lock_guard< std::mutex > lockMarkers(MarkerMutex);
+			std::lock_guard< std::mutex > lockScopes(ScopeMutex);
+
+			// open the output file
+			std::ofstream file(filename, std::ios::binary | std::ios::out);
+
+			// write the scopes
+			Write(file, Scopes.size());
+			for (const auto & scope : Scopes)
+			{
+				Write(file, scope.Filename);
+				Write(file, scope.Name);
+				Write(file, scope.Line);
+			}
+
+			// write the markers
+			Write(file, Markers.size());
+			Write(file, Markers.data(), Markers.size());
+		}
+
+		//!
 		//! Output the results of a profiling session to a JSON file that can
 		//! then be loaded by using the "chrome://tracing" utility of Chrome.
 		//!

@@ -39,7 +39,7 @@ namespace Profiler
 	typedef std::thread::id ThreadID;
 
 	//! The profiling start point
-	extern TimePoint Start;
+	extern const TimePoint Start;
 
 	//! The list of registered scopes
 	extern std::vector< ScopeData > Scopes;
@@ -66,7 +66,7 @@ namespace Profiler
 		std::string Filename;
 
 		//! The line
-		std::size_t Line;
+		uint32_t Line;
 
 	};
 
@@ -77,7 +77,7 @@ namespace Profiler
 	{
 
 		//! The ID of the scope
-		std::size_t ScopeID;
+		uint32_t ScopeID;
 
 		//! Thread ID
 		ThreadID ID;
@@ -93,11 +93,11 @@ namespace Profiler
 	//!
 	//! Register a new scope
 	//!
-	inline std::size_t RegisterScope(std::string && name, std::string && filename, std::size_t line)
+	inline uint32_t RegisterScope(std::string && name, std::string && filename, uint32_t line)
 	{
 		std::lock_guard< std::mutex > lock(ScopeMutex);
 		Scopes.push_back({ name, filename, line });
-		return Scopes.size() - 1;
+		return static_cast< uint32_t >(Scopes.size() - 1);
 	}
 
 	//!
@@ -160,7 +160,7 @@ namespace Profiler
 		//!
 		//! Constructor
 		//!
-		inline ProfileScope(std::size_t scopeID)
+		inline ProfileScope(uint32_t scopeID)
 			: m_ScopeID(scopeID)
 			, m_ThreadID(GetCurrentThreadID())
 			, m_Start(GetCurrentTime())
@@ -183,7 +183,7 @@ namespace Profiler
 	private:
 
 		//! Scope ID
-		std::size_t m_ScopeID;
+		uint32_t m_ScopeID;
 
 		//! Thread ID
 		ThreadID m_ThreadID;
@@ -205,7 +205,7 @@ namespace Profiler
 //! This macro is used with #END_PROFILE(id) to profile a specific piece of code.
 //!
 #define BEGIN_PROFILE(id)																			\
-	static const std::size_t _scope_id_##id = Profiler::RegisterScope(#id, __FILE__, __LINE__);		\
+	static const uint32_t _scope_id_##id = Profiler::RegisterScope(#id, __FILE__, __LINE__);		\
 	Profiler::ThreadID _thread_id_##id = Profiler::GetCurrentThreadID();							\
 	Profiler::TimePoint _start_##id = Profiler::GetCurrentTime();
 
@@ -229,7 +229,11 @@ namespace Profiler
 //!
 //! @see #PROFILE_SCOPE
 //!
-#define PROFILE_FUNCTION() PROFILE_SCOPE(__func__)
+#if defined(_MSC_VER)
+#	define PROFILE_FUNCTION() PROFILE_SCOPE(__FUNCTION__)
+#else
+#	define PROFILE_FUNCTION() PROFILE_SCOPE(__func__)
+#endif
 
 //!
 //! @def PROFILE_SCOPE
@@ -238,7 +242,7 @@ namespace Profiler
 //! use of this macro and the end of the scope it was used in.
 //!
 #define PROFILE_SCOPE(name)																								\
-	static const std::size_t PRIVATE_MERGE(_scope_id_, __LINE__) = Profiler::RegisterScope(name, __FILE__, __LINE__);	\
+	static const uint32_t PRIVATE_MERGE(_scope_id_, __LINE__) = Profiler::RegisterScope(name, __FILE__, __LINE__);		\
 	Profiler::ProfileScope PRIVATE_MERGE(_profile_, __LINE__)(PRIVATE_MERGE(_scope_id_, __LINE__))
 
 //!
@@ -273,7 +277,7 @@ namespace Profiler
 namespace Profiler
 {
 
-	TimePoint Start = GetCurrentTime();
+	const TimePoint Start = GetCurrentTime();
 	std::vector< ScopeData > Scopes;
 	std::mutex ScopeMutex;
 	std::vector< MarkerData > Markers;
