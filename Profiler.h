@@ -28,86 +28,11 @@
 namespace Profiler
 {
 
-	// forward definitions
-	struct MarkerData;
-	struct ScopeData;
-
 	//! Define a precise time point
 	typedef std::chrono::high_resolution_clock::time_point TimePoint;
 
 	//! Defines a thread ID
 	typedef std::thread::id ThreadID;
-
-	//! The profiling start point
-	extern const TimePoint Start;
-
-	//! The list of registered scopes
-	extern std::vector< ScopeData > Scopes;
-
-	//! Mutex to protect scope vector access
-	extern std::mutex ScopeMutex;
-
-	//! The markers
-	extern std::vector< MarkerData > Markers;
-
-	//! Mutex to protect marker vector access
-	extern std::mutex MarkerMutex;
-
-	//!
-	//! Define a scope data
-	//!
-	struct ScopeData
-	{
-
-		//! Name of the scope
-		std::string Name;
-
-		//! The source file
-		std::string Filename;
-
-		//! The line
-		uint32_t Line;
-
-	};
-
-	//!
-	//! A raw input data
-	//!
-	struct MarkerData
-	{
-
-		//! The ID of the scope
-		uint32_t ScopeID;
-
-		//! Thread ID
-		ThreadID ID;
-
-		//! Start point
-		TimePoint Start;
-
-		//! End point
-		TimePoint End;
-
-	};
-
-	//!
-	//! Register a new scope
-	//!
-	inline uint32_t RegisterScope(std::string && name, std::string && filename, uint32_t line)
-	{
-		std::lock_guard< std::mutex > lock(ScopeMutex);
-		Scopes.push_back({ name, filename, line });
-		return static_cast< uint32_t >(Scopes.size() - 1);
-	}
-
-	//!
-	//! Add a new marker
-	//!
-	inline void AddMarker(MarkerData && marker)
-	{
-		std::lock_guard< std::mutex > lock(MarkerMutex);
-		Markers.push_back(std::move(marker));
-	}
 
 	//!
 	//! Get the current thread ID
@@ -149,6 +74,112 @@ namespace Profiler
 		return std::chrono::duration_cast< std::chrono::milliseconds >(end - start).count();
 	}
 
+#if PROFILER_ENABLE == 1
+
+	// forward definitions
+	struct MarkerList;
+	struct MarkerData;
+	struct ScopeData;
+
+	//! Define a string
+	typedef std::string String;
+
+	//! Define a mutex
+	typedef std::mutex Mutex;
+
+	//! Define scope based lock on a mutex
+	template < typename Type > using ScopedLock = std::lock_guard< Type >;
+
+	//! Define a dynamically allocated vector
+	template < typename Type > using Vector = std::vector< Type >;
+
+	//! The profiling start point
+	extern const TimePoint Start;
+
+	//! The list of registered scopes
+	extern Vector< ScopeData > Scopes;
+
+	//! Mutex to protect scope vector access
+	extern Mutex ScopeMutex;
+
+	//! The global marker lists
+	extern Vector< Vector< MarkerData > * > MarkerLists;
+
+	//! Mutex to protect Markers access
+	extern Mutex MarkerMutex;
+
+	//! The "per-thread" marker lists
+	extern thread_local MarkerList Markers;
+
+	//!
+	//! Define a scope data
+	//!
+	struct ScopeData
+	{
+
+		//! Name of the scope
+		String Name;
+
+		//! The source file
+		String Filename;
+
+		//! The line
+		uint32_t Line;
+
+	};
+
+	//!
+	//! A raw input data
+	//!
+	struct MarkerData
+	{
+
+		//! The ID of the scope
+		uint32_t ScopeID;
+
+		//! Thread ID
+		ThreadID ID;
+
+		//! Start point
+		TimePoint Start;
+
+		//! End point
+		TimePoint End;
+
+	};
+
+	//!
+	//! Structure used to register per-thread marker lists to the global markers one.
+	//!
+	struct MarkerList
+	{
+
+		//!
+		//! Constructor. This will allocate a vector of MarkerData, and register it
+		//! to the global list of marker lists
+		//!
+		inline MarkerList(void)
+			: Data(new Vector< MarkerData >())
+		{
+			ScopedLock< Mutex > lock(MarkerMutex);
+			MarkerLists.push_back(Data);
+		}
+
+		//! The markers
+		Vector< MarkerData > * Data;
+
+	};
+
+	//!
+	//! Register a new scope
+	//!
+	inline uint32_t RegisterScope(String && name, String && filename, uint32_t line)
+	{
+		ScopedLock< Mutex > lock(ScopeMutex);
+		Scopes.push_back({ name, filename, line });
+		return static_cast< uint32_t >(Scopes.size() - 1);
+	}
+
 	//!
 	//! Scope based profile
 	//!
@@ -170,9 +201,9 @@ namespace Profiler
 		//!
 		//! Destructor
 		//!
-		~ProfileScope(void)
+		inline ~ProfileScope(void)
 		{
-			AddMarker({
+			Markers.Data->push_back({
 				m_ScopeID,
 				m_ThreadID,
 				m_Start,
@@ -192,6 +223,9 @@ namespace Profiler
 		TimePoint m_Start;
 
 	};
+
+#endif // PROFILER_ENABLE == 1
+
 
 } // namespace Profiler
 
@@ -278,10 +312,11 @@ namespace Profiler
 {
 
 	const TimePoint Start = GetCurrentTime();
-	std::vector< ScopeData > Scopes;
-	std::mutex ScopeMutex;
-	std::vector< MarkerData > Markers;
-	std::mutex MarkerMutex;
+	Vector< ScopeData > Scopes;
+	Mutex ScopeMutex;
+	Vector< Vector< MarkerData > * > MarkerLists;
+	Mutex MarkerMutex;
+	thread_local MarkerList Markers;
 
 } // namespace Profiler
 

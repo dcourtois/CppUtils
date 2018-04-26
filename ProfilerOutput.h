@@ -53,6 +53,9 @@ namespace Profiler
 			// open the output file
 			std::ofstream file(filename, std::ios::binary | std::ios::out);
 
+			// Write the start time
+			Write(file, Start);
+
 			// write the scopes
 			Write(file, Scopes.size());
 			for (const auto & scope : Scopes)
@@ -63,8 +66,12 @@ namespace Profiler
 			}
 
 			// write the markers
-			Write(file, Markers.size());
-			Write(file, Markers.data(), Markers.size());
+			Write(file, MarkerLists.size());
+			for (const auto * markers : MarkerLists)
+			{
+				Write(file, markers->size());
+				Write(file, markers->data(), markers->size());
+			}
 		}
 
 		//!
@@ -85,26 +92,29 @@ namespace Profiler
 
 			// and write data
 			bool first = true;
-			for (const auto & marker : Markers)
+			for (const auto * markers : MarkerLists)
 			{
-				const ScopeData & scope = Scopes[marker.ScopeID];
-				std::string scopeFilename = scope.Filename;
-				std::replace(scopeFilename.begin(), scopeFilename.end(), '\\', '/');
-				if (first == false)
+				for (const auto & marker : *markers)
 				{
-					file << "," << std::endl;
+					const ScopeData & scope = Scopes[marker.ScopeID];
+					std::string scopeFilename = scope.Filename;
+					std::replace(scopeFilename.begin(), scopeFilename.end(), '\\', '/');
+					if (first == false)
+					{
+						file << "," << std::endl;
+					}
+					else
+					{
+						file << std::endl;
+						first = false;
+					}
+					file << "{ \"cat\": \"perf\", \"ph\": \"X\", \"pid\": \"foo\", ";
+					file << "\"name\": \"" << scope.Name << "\", ";
+					file << "\"tid\": " << marker.ID << ", ";
+					file << "\"ts\": " << GetMicroSeconds(Start, marker.Start) << ", ";
+					file << "\"dur\": " << GetMicroSeconds(marker.Start, marker.End) << ", ";
+					file << "\"args\": { \"filename\": \"" << scopeFilename << "\", \"line\": " << scope.Line << " } }";
 				}
-				else
-				{
-					file << std::endl;
-					first = false;
-				}
-				file << "{ \"cat\": \"perf\", \"ph\": \"X\", \"pid\": \"foo\", ";
-				file << "\"name\": \"" << scope.Name << "\", ";
-				file << "\"tid\": " << marker.ID << ", ";
-				file << "\"ts\": " << GetMicroSeconds(Start, marker.Start) << ", ";
-				file << "\"dur\": " << GetMicroSeconds(marker.Start, marker.End) << ", ";
-				file << "\"args\": { \"filename\": \"" << scopeFilename << "\", \"line\": " << scope.Line << " } }";
 			}
 
 			// close
