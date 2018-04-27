@@ -44,11 +44,11 @@ namespace Profiler
 		//!
 		//! Raw output
 		//!
-		inline void Raw(const std::string & filename)
+		inline void Raw(String & filename)
 		{
 			// first, ensure that nobody else is modifying the profiling data
-			std::lock_guard< std::mutex > lockMarkers(MarkerMutex);
-			std::lock_guard< std::mutex > lockScopes(ScopeMutex);
+			ScopedLock< Mutex > lockMarkers(MarkerMutex);
+			ScopedLock< Mutex > lockScopes(ScopeMutex);
 
 			// open the output file
 			std::ofstream file(filename, std::ios::binary | std::ios::out);
@@ -83,8 +83,8 @@ namespace Profiler
 		inline void ChromeTracing(const std::string & filename)
 		{
 			// first, ensure that nobody else is modifying the profiling data
-			std::lock_guard< std::mutex > lockMarkers(MarkerMutex);
-			std::lock_guard< std::mutex > lockScopes(ScopeMutex);
+			ScopedLock< Mutex > lockMarkers(MarkerMutex);
+			ScopedLock< Mutex > lockScopes(ScopeMutex);
 
 			// open the output file
 			std::ofstream file(filename);
@@ -119,7 +119,6 @@ namespace Profiler
 
 			// close
 			file << std::endl << "]" << std::endl;
-			file.close();
 		}
 
 	} // namespace Output
