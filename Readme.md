@@ -12,6 +12,39 @@ Content
 Each of the this utility is commented, but following is a small overview of each one. For more information,
 check the comments directly in the sources.
 
+Hash
+----
+
+Utilities related to hashing. For the moment:
+
+- [Jenkins' One-at-a-time](https://en.wikipedia.org/wiki/Jenkins_hash_function#one_at_a_time) algorithm to hash strings or arbitrary char data
+- Compile-time implementation of the previous algorithm
+- Combine hash keys
+
+How to use:
+
+```cpp
+#include "Hash.h"
+
+// somewhere, you have a string and want to check its various possible values. Thanks
+// to compile time hashing, you can use a switch (assuming str is a std::string)
+switch (Hash::Jenkins(str))
+{
+	case HASH("foo"):
+		break;
+
+	case HASH("bar"):
+		break;
+
+	// ...
+}
+
+// if you want to combine 2 hashes:
+uint32_t key1 = Hash::Jenkins("foo");
+uint32_t key2 = Hash::Jenkins("bar");
+uint32_t key = Hash::Combine(key1, key2);
+```
+
 Memory Tracker
 --------------
 
@@ -21,7 +54,7 @@ it's a lifesaver.
 
 How to use:
 
-```
+```cpp
 // in a header:
 #define MEMORY_CHECK 1
 #include "MemoryTracker.h"
@@ -34,7 +67,7 @@ How to use:
 char * data = MT_NEW char[32];
 MT_DELETE [] data;
 
-// you can managed the tracked memory using the following macros:
+// you can manage the tracked memory using the following macros:
 
 // this one reset the memory tracker
 MT_INIT_MEM_TRACKER();
@@ -58,7 +91,7 @@ be displayed using Chrome's tracing functionality.
 
 How to use:
 
-```
+```cpp
 // in a header
 #define PROFILER_ENABLE 1
 #include "Profiler.h"
@@ -92,7 +125,7 @@ passed to the jobs)
 
 How to use:
 
-```
+```cpp
 #include "TaskManager.h"
 
 
