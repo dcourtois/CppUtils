@@ -148,3 +148,10 @@ for (int i = 0; i < 10; ++i)
 	});
 }
 ```
+
+
+STLUtils
+--------
+
+Just a collection of free functions mostly to work with containers, because I'm lazy, and usually I prefer
+writing `if (Contains(container, item) == true)` instead of `if (std::find(container.begin(), container.end(), item) != container.end())`
