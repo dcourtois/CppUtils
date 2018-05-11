@@ -144,7 +144,7 @@ namespace Profiler
 					else
 					{
 						range->second.first = std::min(range->second.first, marker.Start);
-						range->second.second = std::min(range->second.second, marker.End);
+						range->second.second = std::max(range->second.second, marker.End);
 					}
 
 					// global time range
