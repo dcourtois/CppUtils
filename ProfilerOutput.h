@@ -156,7 +156,7 @@ namespace Profiler
 					inclusive[marker.Scope] += ns;
 					exclusive[marker.Scope] += ns;
 					counts[marker.Scope] += 1;
-					if (marker.ParentScope != static_cast<ScopeID>(-1))
+					if (marker.ParentScope != static_cast< ScopeID >(-1))
 					{
 						exclusive[marker.ParentScope] -= ns;
 					}

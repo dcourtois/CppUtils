@@ -271,7 +271,8 @@ namespace Profiler
 //! Used with #BEGIN_PROFILE(id) to profile a specific piece of code.
 //!
 #define END_PROFILE(id)									\
-	Profiler::AddMarker({								\
+	Profiler::Markers.Data->push_back({					\
+		Profiler::CurrentScope,							\
 		_scope_id_##id,									\
 		_thread_id_##id,								\
 		_start_##id,									\
@@ -295,13 +296,13 @@ namespace Profiler
 #endif
 
 //!
-//! @def PROFILE_SCOPE
+//! @def PROFILE_SCOPE(name)
 //!
 //! Profile the current scope : will profile what happens between the
 //! use of this macro and the end of the scope it was used in.
 //!
-#define PROFILE_SCOPE(name)																								\
-	static const uint32_t PRIVATE_MERGE(_scope_id_, __LINE__) = Profiler::RegisterScope(name, __FILE__, __LINE__);		\
+#define PROFILE_SCOPE(name)																									\
+	static const Profiler::ScopeID PRIVATE_MERGE(_scope_id_, __LINE__) = Profiler::RegisterScope(name, __FILE__, __LINE__);	\
 	Profiler::ProfileScope PRIVATE_MERGE(_profile_, __LINE__)(PRIVATE_MERGE(_scope_id_, __LINE__))
 
 //!
