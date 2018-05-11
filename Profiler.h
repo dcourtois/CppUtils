@@ -53,7 +53,7 @@ namespace Profiler
 	//!
 	//! Get the time elapsed between 2 time points in nanoseconds
 	//!
-	inline int64_t GetNanoSeconds(TimePoint start, TimePoint end)
+	inline uint64_t GetNanoSeconds(TimePoint start, TimePoint end)
 	{
 		return std::chrono::duration_cast< std::chrono::nanoseconds >(end - start).count();
 	}
@@ -61,7 +61,7 @@ namespace Profiler
 	//!
 	//! Get the time elapsed between 2 time points in microseconds
 	//!
-	inline int64_t GetMicroSeconds(TimePoint start, TimePoint end)
+	inline uint64_t GetMicroSeconds(TimePoint start, TimePoint end)
 	{
 		return std::chrono::duration_cast< std::chrono::microseconds >(end - start).count();
 	}
@@ -69,7 +69,7 @@ namespace Profiler
 	//!
 	//! Get the time elapsed between 2 time points in milliseconds
 	//!
-	inline int64_t GetMilliSeconds(TimePoint start, TimePoint end)
+	inline uint64_t GetMilliSeconds(TimePoint start, TimePoint end)
 	{
 		return std::chrono::duration_cast< std::chrono::milliseconds >(end - start).count();
 	}
@@ -80,6 +80,9 @@ namespace Profiler
 	struct MarkerList;
 	struct MarkerData;
 	struct ScopeData;
+
+	//! Define a scope ID
+	typedef uint16_t ScopeID;
 
 	//! Define a string
 	typedef std::string String;
@@ -111,6 +114,9 @@ namespace Profiler
 	//! The "per-thread" marker lists
 	extern thread_local MarkerList Markers;
 
+	//! The per-thread current scope ID
+	extern thread_local ScopeID CurrentScope;
+
 	//!
 	//! Define a scope data
 	//!
@@ -134,11 +140,14 @@ namespace Profiler
 	struct MarkerData
 	{
 
+		//! The ID of the parent scope
+		ScopeID ParentScope;
+
 		//! The ID of the scope
-		uint32_t ScopeID;
+		ScopeID Scope;
 
 		//! Thread ID
-		ThreadID ID;
+		ThreadID Thread;
 
 		//! Start point
 		TimePoint Start;
@@ -173,11 +182,11 @@ namespace Profiler
 	//!
 	//! Register a new scope
 	//!
-	inline uint32_t RegisterScope(String && name, String && filename, uint32_t line)
+	inline ScopeID RegisterScope(String && name, String && filename, uint32_t line)
 	{
 		ScopedLock< Mutex > lock(ScopeMutex);
 		Scopes.push_back({ name, filename, line });
-		return static_cast< uint32_t >(Scopes.size() - 1);
+		return static_cast< ScopeID >(Scopes.size() - 1);
 	}
 
 	//!
@@ -191,11 +200,14 @@ namespace Profiler
 		//!
 		//! Constructor
 		//!
-		inline ProfileScope(uint32_t scopeID)
-			: m_ScopeID(scopeID)
-			, m_ThreadID(GetCurrentThreadID())
+		inline ProfileScope(ScopeID scope)
+			: m_ParentScope(CurrentScope)
+			, m_Scope(scope)
+			, m_Thread(GetCurrentThreadID())
 			, m_Start(GetCurrentTime())
 		{
+			// update the current scope
+			CurrentScope = scope;
 		}
 
 		//!
@@ -203,21 +215,29 @@ namespace Profiler
 		//!
 		inline ~ProfileScope(void)
 		{
+			// add the marker
 			Markers.Data->push_back({
-				m_ScopeID,
-				m_ThreadID,
+				m_ParentScope,
+				m_Scope,
+				m_Thread,
 				m_Start,
 				GetCurrentTime()
 			});
+
+			// restore the current scope
+			CurrentScope = m_ParentScope;
 		}
 
 	private:
 
+		//! Parent scope ID
+		ScopeID m_ParentScope;
+
 		//! Scope ID
-		uint32_t m_ScopeID;
+		ScopeID m_Scope;
 
 		//! Thread ID
-		ThreadID m_ThreadID;
+		ThreadID m_Thread;
 
 		//! Starting point
 		TimePoint m_Start;
@@ -238,23 +258,26 @@ namespace Profiler
 //!
 //! This macro is used with #END_PROFILE(id) to profile a specific piece of code.
 //!
-#define BEGIN_PROFILE(id)																			\
-	static const uint32_t _scope_id_##id = Profiler::RegisterScope(#id, __FILE__, __LINE__);		\
-	Profiler::ThreadID _thread_id_##id = Profiler::GetCurrentThreadID();							\
-	Profiler::TimePoint _start_##id = Profiler::GetCurrentTime();
+#define BEGIN_PROFILE(id)																				\
+	static const Profiler::ScopeID _scope_id_##id = Profiler::RegisterScope(#id, __FILE__, __LINE__);	\
+	Profiler::ScopeID _previous_scope_id_##id = CurrentScope;											\
+	Profiler::CurrentScope = _scope_id_##id;															\
+	Profiler::ThreadID _thread_id_##id = Profiler::GetCurrentThreadID();								\
+	Profiler::TimePoint _start_##id = Profiler::GetCurrentTime()
 
 //!
 //! @def END_PROFILE(id)
 //!
 //! Used with #BEGIN_PROFILE(id) to profile a specific piece of code.
 //!
-#define END_PROFILE(id)				\
-	Profiler::AddMarker({			\
-		_scope_id_##id,				\
-		_thread_id_##id,			\
-		_start_##id,				\
-		Profiler::GetCurrentTime()	\
-	})
+#define END_PROFILE(id)									\
+	Profiler::AddMarker({								\
+		_scope_id_##id,									\
+		_thread_id_##id,								\
+		_start_##id,									\
+		Profiler::GetCurrentTime()						\
+	})													\
+	Profiler::CurrentScope = _previous_scope_id_##id
 
 //!
 //! @def PROFILE_FUNCTION
@@ -317,6 +340,7 @@ namespace Profiler
 	Vector< Vector< MarkerData > * > MarkerLists;
 	Mutex MarkerMutex;
 	thread_local MarkerList Markers;
+	thread_local ScopeID CurrentScope = static_cast< ScopeID >(-1);
 
 } // namespace Profiler
 
