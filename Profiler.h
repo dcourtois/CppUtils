@@ -288,6 +288,8 @@ namespace Profiler
 //!
 #if defined(_MSC_VER)
 #	define PROFILE_FUNCTION() PROFILE_SCOPE(__FUNCTION__)
+#elif defined(__GNUC__)
+#	define PROFILE_FUNCTION() PROFILE_SCOPE(__PRETTY_FUNCTION__)
 #else
 #	define PROFILE_FUNCTION() PROFILE_SCOPE(__func__)
 #endif
