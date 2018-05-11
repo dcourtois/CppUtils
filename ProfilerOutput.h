@@ -186,8 +186,8 @@ namespace Profiler
 					";" << GetReadableTime(exclusive[i]) <<
 					";" << GetReadableTime(inclusive[i] / counts[i]) <<
 					";" << GetReadableTime(exclusive[i] / counts[i]) <<
-					";" << GetDouble(double(inclusive[i]) / double(execTime), 2) << " %" <<
-					";" << GetDouble(double(exclusive[i]) / double(execTime), 2) << " %" <<
+					";" << GetDouble((100.0 * inclusive[i]) / double(execTime), 2) << " %" <<
+					";" << GetDouble((100.0 * exclusive[i]) / double(execTime), 2) << " %" <<
 					std::endl;
 			}
 		}
