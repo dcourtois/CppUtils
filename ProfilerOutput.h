@@ -143,21 +143,15 @@ namespace Profiler
 					}
 					else
 					{
-						if (range->second.first > marker.Start)
-						{
-							range->second.first = marker.Start;
-						}
-						if (range->second.second < marker.End)
-						{
-							range->second.second = marker.End;
-						}
+						range->second.first = std::min(range->second.first, marker.Start);
+						range->second.second = std::min(range->second.second, marker.End);
 					}
 
 					// global time range
 					min = std::min(min, marker.Start);
 					max = std::max(max, marker.End);
 
-					// update the exec time and counts
+					// update the exec times and counts
 					uint64_t ns = GetNanoSeconds(marker.Start, marker.End);
 					inclusive[marker.Scope] += ns;
 					exclusive[marker.Scope] += ns;
