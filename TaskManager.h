@@ -36,61 +36,11 @@ public:
 	//!
 	TaskManager(int threadCount = -1)
 		: m_Stop(false)
-		, m_TaskCount(0)
+		, m_QueuedTaskCount(0)
+		, m_RunningTaskCount(0)
 	{
-		// get the number of threads supported by the platform if no threadCount
-		// was provided.
-		if (threadCount == -1)
-		{
-			threadCount = std::thread::hardware_concurrency();
-		}
-
-		// create the data
-		for (int i = 0; i < threadCount; ++i)
-		{
-			// create the thread local storage
-			m_ThreadLocalStorage.emplace_back(nullptr);
-
-			// create the thread
-			m_Threads.emplace_back(std::thread([this, i] (void) {
-				// the loop should be going on until the task manager wants to stop, or
-				// we still have tasks to process.
-				while (m_Stop == false || this->HasTask() == true)
-				{
-					// lock the queue's mutex to check if there is a task to do
-					m_QueueMutex.lock();
-
-					// check if we have tasks
-					if (m_Queue.empty())
-					{
-						// No task. Allow new ones to be queued
-						m_QueueMutex.unlock();
-
-						// and wait for something to do (we use a predicate to only wait
-						// if the task manager has not been stopped)
-						std::unique_lock< std::mutex > uniqueLock(m_ConditionVariableMutex);
-						m_ConditionVariable.wait(uniqueLock);
-
-						// once activated, we want to go back to the beginning of the loop
-						// to lock again the queue's mutex and check the queue, etc.
-						continue;
-					}
-					else
-					{
-						// we've got a task ! Get it, pop it, and release the queue's lock.
-						Task task(std::move(m_Queue.front()));
-						m_Queue.pop();
-						m_QueueMutex.unlock();
-
-						// and execute it
-						task(m_ThreadLocalStorage[i]);
-
-						// when done executing, decrease the task count
-						--m_TaskCount;
-					}
-				}
-			}));
-		}
+		// init the threads
+		this->SetThreadCount(threadCount, false);
 	}
 
 	//!
@@ -100,17 +50,9 @@ public:
 	//!
 	~TaskManager(void)
 	{
-		// notify the threads that they should stop
 		m_Stop = true;
-
-		// make sure threads are awake
 		m_ConditionVariable.notify_all();
-
-		// join threads
-		for (std::thread & thread : m_Threads)
-		{
-			thread.join();
-		}
+		this->JoinThreads();
 	}
 
 	//!
@@ -118,8 +60,7 @@ public:
 	//!
 	inline bool HasTask(void)
 	{
-		std::lock_guard< std::mutex > lock(m_QueueMutex);
-		return m_Queue.empty() == false;
+		return m_QueuedTaskCount > 0;
 	}
 
 	//!
@@ -151,6 +92,13 @@ public:
 	//!
 	inline void PushTask(Task && task)
 	{
+		// do nothing if we're stopping
+		if (m_Stop == true)
+		{
+			return;
+		}
+
+		// check if we have some threads
 		if (m_Threads.empty() == true)
 		{
 			// no jobs, just execute the task
@@ -162,7 +110,7 @@ public:
 			{
 				std::lock_guard< std::mutex > lock(m_QueueMutex);
 				m_Queue.emplace(task);
-				++m_TaskCount;
+				++m_QueuedTaskCount;
 			}
 
 			// and notify one thread that we have a job to do
@@ -180,24 +128,122 @@ public:
 	}
 
 	//!
-	//! Get the number of threads. The number of threads is specified
-	//! in the constructor of the TaskManager and can't be changed
-	//! afterwards.
+	//! Get the number of threads.
 	//!
-	inline int GetNumThreads(void) const
+	inline int GetThreadCount(void) const
 	{
 		return static_cast< int >(m_Threads.size());
 	}
 
 	//!
-	//! Wait until there is no longer any task queued. This will stall the current
-	//! thread.
+	//! Set the number of threads.
+	//!
+	//! @param count
+	//!		Number of threads to use. 0 will execute tasks instantly, -1 will create
+	//!		threads depending on the hardware's capabilities.
+	//!
+	//! @param wait
+	//!		If true, the manager will wait until every task is processed, otherwise
+	//!		it will discard the queued tasks (it will still wait for the running ones)
+	//!
+	inline void SetThreadCount(int count, bool wait)
+	{
+		// ensure we have a valid thread count
+		if (count < 0)
+		{
+			count = std::thread::hardware_concurrency();
+		}
+
+		// do nothing if the number of threads is already correct
+		if (count == this->GetThreadCount())
+		{
+			return;
+		}
+
+		// ensure we're not pushing new tasks
+		m_Stop = true;
+
+		// clear the queue if we don't want to wait
+		if (wait == false)
+		{
+			this->EmptyQueue();
+		}
+
+		// wait until the processing tasks are completed
+		this->Wait();
+
+		// join threads
+		m_ConditionVariable.notify_all();
+		this->JoinThreads();
+
+		// clear previous data and reserve space for new ones
+		m_Threads.clear();
+		m_Threads.reserve(count);
+		m_ThreadLocalStorage.clear();
+		m_ThreadLocalStorage.reserve(count);
+
+		// restore the stop atomic
+		m_Stop = false;
+
+		// create the data
+		for (int i = 0; i < count; ++i)
+		{
+			// create the thread local storage
+			m_ThreadLocalStorage.emplace_back(nullptr);
+
+			// create the thread
+			m_Threads.emplace_back(std::thread([this, i] (void) {
+				// the loop should be going on until the task manager wants to stop, or
+				// we still have tasks to process.
+				while (m_Stop == false || m_QueuedTaskCount > 0)
+				{
+					// lock the queue's mutex to check if there is a task to do
+					m_QueueMutex.lock();
+
+					// check if we have tasks
+					if (m_Queue.empty())
+					{
+						// No task. Allow new ones to be queued
+						m_QueueMutex.unlock();
+
+						// and wait for something to do (we use a predicate to only wait
+						// if the task manager has not been stopped)
+						std::unique_lock< std::mutex > uniqueLock(m_ConditionVariableMutex);
+						m_ConditionVariable.wait(uniqueLock);
+
+						// once activated, we want to go back to the beginning of the loop
+						// to lock again the queue's mutex and check the queue, etc.
+						continue;
+					}
+					else
+					{
+						// we've got a task ! Get it, pop it, and release the queue's lock.
+						Task task(std::move(m_Queue.front()));
+						m_Queue.pop();
+						--m_QueuedTaskCount;
+						++m_RunningTaskCount;
+						m_QueueMutex.unlock();
+
+						// and execute it
+						task(m_ThreadLocalStorage[i]);
+
+						// when done executing, decrease the task count
+						--m_RunningTaskCount;
+					}
+				}
+			}));
+		}
+	}
+
+	//!
+	//! Wait until there is no longer any task queued or running.
+	//! This will stall the current thread.
 	//!
 	inline void Wait(void)
 	{
-		while (m_TaskCount > 0)
+		while (m_RunningTaskCount > 0 || m_QueuedTaskCount > 0)
 		{
-			std::this_thread::sleep_for(std::chrono::milliseconds(1));
+			std::this_thread::sleep_for(std::chrono::milliseconds(10));
 		}
 	}
 
@@ -207,14 +253,10 @@ public:
 	//!
 	inline void Cancel(void)
 	{
-		// clear the queue task
+		// clear the task queue
 		{
 			std::lock_guard< std::mutex > lock(m_QueueMutex);
-			while (m_Queue.empty() == false)
-			{
-				m_Queue.pop();
-				--m_TaskCount;
-			}
+			this->EmptyQueue();
 		}
 
 		// and wait for running ones
@@ -222,6 +264,30 @@ public:
 	}
 
 private:
+
+	//!
+	//! Empty the queue. This will not lock the queue, use carefully.
+	//!
+	inline void EmptyQueue(void)
+	{
+		while (m_Queue.empty() == false)
+		{
+			m_Queue.pop();
+			--m_QueuedTaskCount;
+		}
+	}
+
+	//!
+	//! Join threads
+	//!
+	inline void JoinThreads(void)
+	{
+		// join threads
+		for (std::thread & thread : m_Threads)
+		{
+			thread.join();
+		}
+	}
 
 	//! The list of threads
 	std::vector< std::thread > m_Threads;
@@ -244,8 +310,11 @@ private:
 	//! Fake thread local storage
 	std::vector< void * > m_ThreadLocalStorage;
 
-	//! Number of tasks in the queue + running ones
-	std::atomic_int m_TaskCount;
+	//! Number of tasks in the queue
+	std::atomic_int m_QueuedTaskCount;
+
+	//! Number of running tasks
+	std::atomic_int m_RunningTaskCount;
 
 };
 
