@@ -224,7 +224,7 @@ namespace Profiler
 				GetCurrentTime()
 			});
 
-			// restore the current scope
+			// restore the previous scope
 			CurrentScope = m_ParentScope;
 		}
 
@@ -251,34 +251,6 @@ namespace Profiler
 
 
 #if PROFILER_ENABLE == 1
-
-
-//!
-//! @def BEGIN_PROFILE(id)
-//!
-//! This macro is used with #END_PROFILE(id) to profile a specific piece of code.
-//!
-#define BEGIN_PROFILE(id)																				\
-	static const Profiler::ScopeID _scope_id_##id = Profiler::RegisterScope(#id, __FILE__, __LINE__);	\
-	Profiler::ScopeID _previous_scope_id_##id = CurrentScope;											\
-	Profiler::CurrentScope = _scope_id_##id;															\
-	Profiler::ThreadID _thread_id_##id = Profiler::GetCurrentThreadID();								\
-	Profiler::TimePoint _start_##id = Profiler::GetCurrentTime()
-
-//!
-//! @def END_PROFILE(id)
-//!
-//! Used with #BEGIN_PROFILE(id) to profile a specific piece of code.
-//!
-#define END_PROFILE(id)									\
-	Profiler::Markers.Data->push_back({					\
-		Profiler::CurrentScope,							\
-		_scope_id_##id,									\
-		_thread_id_##id,								\
-		_start_##id,									\
-		Profiler::GetCurrentTime()						\
-	})													\
-	Profiler::CurrentScope = _previous_scope_id_##id
 
 //!
 //! @def PROFILE_FUNCTION
@@ -315,12 +287,13 @@ namespace Profiler
 //!
 #define PRIVATE_MERGE(a, b) PRIVATE_MERGE_2(a, b)
 
+//
+// convenience output functions
+//
 #include "ProfilerOutput.h"
 
 #else
 
-#	define BEGIN_PROFILE(id)		(void)0
-#	define END_PROFILE(id)			(void)0
 #	define PROFILE_FUNCTION()		(void)0
 #	define PROFILE_SCOPE(name)		(void)0
 
