@@ -155,3 +155,24 @@ STLUtils
 
 Just a collection of free functions mostly to work with containers, because I'm lazy, and usually I prefer
 writing `if (Contains(container, item) == true)` instead of `if (std::find(container.begin(), container.end(), item) != container.end())`
+
+Variant
+-------
+
+Small helper used to store and convert to / from numerical types, boolean and string.
+
+```cpp
+// you can initialize from basic types
+Variant foo(1.0);
+
+// you can convert to other types
+std::string str = static_cast< std::string >(foo);
+bool b = static_cast< bool >(foo);
+
+// you can dynamically change the type
+foo = "bar";
+
+// and compare
+bool baz = foo != "baz";
+bool bar = foo == "bar";
+```
