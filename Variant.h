@@ -278,7 +278,7 @@ public:
 			case Type::Signed:		return std::to_string(m_Data.i);
 			case Type::Unsigned:	return std::to_string(m_Data.ui);
 			case Type::Bool:		return m_Data.b == true ? "1" : "0";
-			case Type::None:		return "";
+			default:				return "";
 		}
 	}
 
@@ -292,7 +292,7 @@ public:
 			case Type::Signed:		return static_cast< double >(m_Data.i);
 			case Type::Unsigned:	return static_cast< double >(m_Data.ui);
 			case Type::Bool:		return m_Data.b == true ? 1.0 : 0.0;
-			case Type::None:		return 0.0;
+			default:				return 0.0;
 		}
 	}
 
@@ -306,7 +306,7 @@ public:
 			case Type::Signed:		return static_cast< float >(m_Data.i);
 			case Type::Unsigned:	return static_cast< float >(m_Data.ui);
 			case Type::Bool:		return m_Data.b == true ? 1.0f : 0.0f;
-			case Type::None:		return 0.0f;
+			default:				return 0.0f;
 		}
 	}
 
@@ -320,7 +320,7 @@ public:
 			case Type::Signed:		return m_Data.i;
 			case Type::Unsigned:	return static_cast< int64_t >(m_Data.ui);
 			case Type::Bool:		return m_Data.b == true ? 1 : 0;
-			case Type::None:		return 0;
+			default:				return 0;
 		}
 	}
 
@@ -329,12 +329,12 @@ public:
 	{
 		switch (m_Type)
 		{
-			case Type::String:		return std::atoll(m_Data.s.c_str());
+			case Type::String:		return static_cast< int >(std::atoll(m_Data.s.c_str()));
 			case Type::Double:		return static_cast< int >(m_Data.d);
 			case Type::Signed:		return static_cast< int >(m_Data.i);
 			case Type::Unsigned:	return static_cast< int >(m_Data.ui);
 			case Type::Bool:		return m_Data.b == true ? 1 : 0;
-			case Type::None:		return 0;
+			default:				return 0;
 		}
 	}
 
@@ -348,7 +348,7 @@ public:
 			case Type::Signed:		return static_cast< int >(m_Data.i);
 			case Type::Unsigned:	return m_Data.ui;
 			case Type::Bool:		return m_Data.b == true ? 1 : 0;
-			case Type::None:		return 0;
+			default:				return 0;
 		}
 	}
 
@@ -357,12 +357,12 @@ public:
 	{
 		switch (m_Type)
 		{
-			case Type::String:		return std::atoll(m_Data.s.c_str());
+			case Type::String:		return static_cast< unsigned int >(std::atoll(m_Data.s.c_str()));
 			case Type::Double:		return static_cast< unsigned int >(m_Data.d);
 			case Type::Signed:		return static_cast< unsigned int >(m_Data.i);
 			case Type::Unsigned:	return static_cast< unsigned int >(m_Data.ui);
 			case Type::Bool:		return m_Data.b == true ? 1 : 0;
-			case Type::None:		return 0;
+			default:				return 0;
 		}
 	}
 
@@ -376,7 +376,7 @@ public:
 			case Type::Signed:		return m_Data.i != 0;
 			case Type::Unsigned:	return m_Data.ui != 0;
 			case Type::Bool:		return m_Data.b;
-			case Type::None:		return 0;
+			default:				return false;
 		}
 	}
 
