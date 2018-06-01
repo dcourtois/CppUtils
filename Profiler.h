@@ -252,6 +252,7 @@ namespace Profiler
 
 #if PROFILER_ENABLE == 1
 
+
 //!
 //! @def PROFILE_FUNCTION
 //!
@@ -287,17 +288,22 @@ namespace Profiler
 //!
 #define PRIVATE_MERGE(a, b) PRIVATE_MERGE_2(a, b)
 
+
+#else // PROFILER_ENABLE == 0
+
+
+#	define PROFILE_FUNCTION()		(void)0
+#	define PROFILE_SCOPE(name)		(void)0
+
+
+#endif // PROFILER_ENABLE
+
+
 //
 // convenience output functions
 //
 #include "ProfilerOutput.h"
 
-#else
-
-#	define PROFILE_FUNCTION()		(void)0
-#	define PROFILE_SCOPE(name)		(void)0
-
-#endif
 
 #endif // PROFILER_H
 

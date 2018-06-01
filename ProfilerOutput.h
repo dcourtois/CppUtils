@@ -2,10 +2,28 @@
 #define PROFILER_OUTPUT_H
 
 
-#if PROFILER_ENABLE == 1
-
-
 #include <string>
+
+
+#if PROFILER_ENABLE == 0
+
+
+namespace Profiler
+{
+	namespace Output
+	{
+
+		inline void Raw(const std::string &)					{}
+		inline void CommaSeparatedValues(const std::string &)	{}
+		inline void ChromeTracing(const std::string &)			{}
+
+	} // namespace Output
+} // namespace Profiler
+
+
+#else
+
+
 #include <mutex>
 #include <fstream>
 #include <algorithm>
@@ -35,7 +53,7 @@ namespace Profiler
 		//!
 		//! Override for strings
 		//!
-		template<> inline void Write(std::ofstream & file, const std::string & data)
+		template<> inline void Write(std::ofstream & file, const String & data)
 		{
 			Write(file, data.size());
 			file.write(data.data(), data.size());
@@ -48,7 +66,7 @@ namespace Profiler
 		{
 			String string = std::to_string(value);
 			auto dot = string.find('.');
-			if (dot == std::string::npos)
+			if (dot == String::npos)
 			{
 				return string;
 			}
@@ -192,7 +210,7 @@ namespace Profiler
 		//!
 		//! See Trace Event Format : https://docs.google.com/document/d/1CvAClvFfyA5R-PhYUmn5OOQtYMH4h6I0nSsKchNAySU/preview
 		//!
-		inline void ChromeTracing(const std::string & filename)
+		inline void ChromeTracing(const String & filename)
 		{
 			// first, ensure that nobody else is modifying the profiling data
 			ScopedLock< Mutex > lockMarkers(MarkerMutex);
@@ -209,7 +227,7 @@ namespace Profiler
 				for (const auto & marker : *markers)
 				{
 					const ScopeData & scope = Scopes[marker.Scope];
-					std::string scopeFilename = scope.Filename;
+					String scopeFilename = scope.Filename;
 					std::replace(scopeFilename.begin(), scopeFilename.end(), '\\', '/');
 					if (first == false)
 					{
@@ -237,6 +255,7 @@ namespace Profiler
 } // namespace Profiler
 
 
-#endif // PROFILER_ENABLE == 1
+
+#endif // PROFILER_ENABLE
 
 #endif // PROFILER_OUTPUT_H
