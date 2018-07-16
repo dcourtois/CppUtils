@@ -63,6 +63,11 @@ How to use:
 #define MEMORY_TRACKER_IMPLEMENTATION
 #include "MemoryTracker.h"
 
+// by default, the global memory tracker is disabled (to avoid tracking statically
+// allcoated data) so you need to enable it at the start of your app, for instance
+// at the beginning of the main
+MT_SET_ENABLED(true);
+
 // in the rest of the code, use the provided macros to (de)allocate memory:
 char * data = MT_NEW char[32];
 MT_DELETE [] data;
@@ -73,7 +78,7 @@ MT_DELETE [] data;
 MT_INIT_MEM_TRACKER();
 
 // this one will make the app crash on the 124'th allocation
-MT_BREAK_ON_ALLOC(124);
+MT_BREAK_ON_ALLOCATION(124);
 
 // get the currently tracked memory
 int bytes = MT_GET_ALLOCATED_MEM();

@@ -3,7 +3,7 @@
 
 
 //!
-//! \a MEMORY_CHECK
+//! @a MEMORY_CHECK
 //!
 //! By default, memory tracking and leak reporting is only done in
 //! debug. Set this macro to 1 to always activate this, or to 0 to
@@ -16,7 +16,6 @@
 #		define MEMORY_CHECK 1
 #	endif
 #endif
-
 
 
 #if MEMORY_CHECK == 1
@@ -74,12 +73,21 @@ public:
 
 	//!
 	//! Define a chunk of tracked memory
-	//! - number of bytes
-	//! - filename
-	//! - line
-	//! - allocation number (can be used with BreakOnAlloc)
 	//!
-	typedef std::tuple<size_t, const char *, int, int64_t> Chunk;
+	struct Chunk
+	{
+		//! Number of allocated bytes
+		size_t Bytes;
+
+		//! Filename where it was allocated
+		const char * Filename;
+
+		//! Line at which it was allocated
+		int Line;
+
+		//! The allocation ID. Use with the "break on allocation" feature.
+		int64_t AllocationID;
+	};
 
 	//!
 	//! Define our custom hash map (using a malloc/free allocator to avoid recursive new)
@@ -95,25 +103,26 @@ public:
 	//!
 	//! singleton implementation
 	//!
-	inline static MemoryTracker& GetInstance(void)
+	inline static MemoryTracker& Instance(void)
 	{
-		return s_Instance;
+		static MemoryTracker instance;
+		return instance;
 	}
 
 	//!
 	//! Enable/Disable memory tracking
 	//!
-	inline static void SetEnabled(bool enabled)
+	inline void SetEnabled(bool enabled)
 	{
-		s_Enabled = enabled;
+		m_Enabled = enabled;
 	}
 
 	//!
 	//! Check if the tracker is enabled
 	//!
-	inline static bool IsEnabled(void)
+	inline bool IsEnabled(void)
 	{
-		return s_Enabled;
+		return m_Enabled;
 	}
 
 	//!
@@ -150,7 +159,7 @@ public:
 		uint64_t size = 0;
 		for (const auto & chunk : m_Chunks)
 		{
-			size += std::get< 0 >(chunk.second);
+			size += chunk.second.Bytes;
 		}
 		return size;
 	}
@@ -169,7 +178,7 @@ public:
 	//!
 	inline void Track(void *pointer, size_t size, const char *filename, int line)
 	{
-		if (s_Enabled == true)
+		if (m_Enabled == true)
 		{
 			std::lock_guard< std::mutex > lock(m_Mutex);
 
@@ -181,7 +190,7 @@ public:
 			}
 
 			// update the chunks
-			m_Chunks.insert(std::make_pair(pointer, Chunk(size, filename, line, m_AllocationCount++)));
+			m_Chunks.insert(std::make_pair(pointer, Chunk{ size, filename, line, m_AllocationCount++ }));
 		}
 	}
 
@@ -190,7 +199,7 @@ public:
 	//!
 	inline void Untrack(void *pointer)
 	{
-		if (s_Enabled == true)
+		if (m_Enabled == true)
 		{
 			std::lock_guard<std::mutex> lock(m_Mutex);
 			auto entry = m_Chunks.find(pointer);
@@ -209,6 +218,7 @@ private:
 	MemoryTracker(void)
 		: m_AllocationCount(0)
 		, m_BreakOnAlloc(-1)
+		, m_Enabled(false)
 	{
 	}
 
@@ -217,7 +227,6 @@ private:
 	//!
 	~MemoryTracker(void)
 	{
-		s_Enabled = false;
 	}
 
 	//! mutex used to protect multithreaded access
@@ -233,10 +242,7 @@ private:
 	AllocatedBlockMap m_Chunks;
 
 	//! enable the tracking
-	static bool s_Enabled;
-
-	//! the global instance
-	static MemoryTracker s_Instance;
+	bool m_Enabled;
 
 };
 
@@ -246,7 +252,7 @@ private:
 inline void * operator new (size_t size, const char * filename, int line)
 {
 	void * pointer = malloc(size);
-	MemoryTracker::GetInstance().Track(pointer, size, filename, line);
+	MemoryTracker::Instance().Track(pointer, size, filename, line);
 	return pointer;
 }
 
@@ -256,7 +262,7 @@ inline void * operator new (size_t size, const char * filename, int line)
 inline void * operator new [] (size_t size, const char * filename, int line)
 {
 	void * pointer = malloc(size);
-	MemoryTracker::GetInstance().Track(pointer, size, filename, line);
+	MemoryTracker::Instance().Track(pointer, size, filename, line);
 	return pointer;
 }
 
@@ -265,7 +271,7 @@ inline void * operator new [] (size_t size, const char * filename, int line)
 //!
 inline void operator delete (void * pointer, const char * /* filename */, int /* line */)
 {
-	MemoryTracker::GetInstance().Untrack(pointer);
+	MemoryTracker::Instance().Untrack(pointer);
 	free(pointer);
 }
 
@@ -274,7 +280,7 @@ inline void operator delete (void * pointer, const char * /* filename */, int /*
 //!
 inline void operator delete [] (void * pointer, const char * /* filename */, int /* line */)
 {
-	MemoryTracker::GetInstance().Untrack(pointer);
+	MemoryTracker::Instance().Untrack(pointer);
 	free(pointer);
 }
 
@@ -302,33 +308,33 @@ void operator delete [] (void * pointer) noexcept;
 //! @def MT_SET_ENABLED(enabled)
 //!		Use this macro to enable/disable memory tracking.
 //!
-#define MT_SET_ENABLED(enabled) MemoryTracker::GetInstance().SetEnabled(enabled)
+#define MT_SET_ENABLED(enabled) MemoryTracker::Instance().SetEnabled(enabled)
 
 //!
 //! @def MT_INIT_MEM_TRACKER
 //!		This will reset all tracked memory. This can be used to avoid tracking statically
 //!		allocated stuff.
 //!
-#define MT_INIT_MEM_TRACKER() MemoryTracker::GetInstance().Clear()
+#define MT_INIT_MEM_TRACKER() MemoryTracker::Instance().Clear()
 
 //!
-//! @def MT_BREAK_ON_ALLOC(count)
+//! @def MT_BREAK_ON_ALLOCATION(count)
 //!		Use this macro to tell the memory tracker to break when it reaches @p count
 //!		allocation.
 //!
-#define MT_BREAK_ON_ALLOC(count) MemoryTracker::GetInstance().BreakOnAlloc(count)
+#define MT_BREAK_ON_ALLOCATION(count) MemoryTracker::Instance().BreakOnAlloc(count)
 
 //!
 //! @def MT_GET_ALLOCATED_MEMORY
 //!		Get the currently tracked allocated memory in bytes.
 //!
-#define MT_GET_ALLOCATED_MEMORY() MemoryTracker::GetInstance().GetTrackedMemory()
+#define MT_GET_ALLOCATED_MEMORY() MemoryTracker::Instance().GetTrackedMemory()
 
 //!
 //! @def MT_GET_ALLOCATED_CHUNKS
 //!		Get the currently allocated chunks of memory.
 //!
-#define MT_GET_ALLOCATED_CHUNKS() MemoryTracker::GetInstance().GetTrackedChunks()
+#define MT_GET_ALLOCATED_CHUNKS() MemoryTracker::Instance().GetTrackedChunks()
 
 #else
 
@@ -340,6 +346,51 @@ void operator delete [] (void * pointer) noexcept;
 #	define MT_GET_ALLOCATED_MEMORY()	0
 #	define MT_GET_ALLOCATED_CHUNKS()	0
 
+#endif
+
+//!
+//! @def MT_DECLARE_INLINE_NEW_OPERATOR
+//!		Declare an inline class' operator new function, which will add the
+//!		additional parameters needed for this class to be tracked by the memory
+//!		tracker.
+//!
+//! @def MT_DECLARE_INLINE_DELETE_OPERATOR
+//!		Same as MT_DECLARE_INLINE_NEW_OPERATOR, for the delete operator.
+//!
+#if MEMORY_CHECK == 0
+#	define MT_DECLARE_INLINE_NEW_OPERATOR						\
+		inline static void * operator new (size_t bytes);
+#	define MT_DECLARE_INLINE_DELETE_OPERATOR					\
+		inline static void operator delete (void * pointer);
+#else
+#	define MT_DECLARE_INLINE_NEW_OPERATOR														\
+		inline static void * operator new (size_t bytes, const char * filename, int line);
+#	define MT_DECLARE_INLINE_DELETE_OPERATOR													\
+		inline static void operator delete (void * pointer, const char * filename, int line);	\
+		inline static void operator delete (void * pointer);
+#endif
+
+//!
+//! @def MT_DEFINE_INLINE_NEW_OPERATOR
+//!		Define the operator new for class @a classname. See #MT_DECLARE_INLINE_NEW_OPERATOR.
+//!
+//! @def MT_DEFINE_INLINE_DELETE_OPERATOR
+//!		Same as MT_DEFINE_INLINE_NEW_OPERATOR, for the delete operator.
+//!
+#if MEMORY_CHECK == 0
+#	define MT_DEFINE_INLINE_NEW_OPERATOR(classname)						\
+		inline void * classname::operator new (size_t bytes)
+#	define MT_DEFINE_INLINE_DELETE_OPERATOR(classname, void * pointer)	\
+		inline void classname::operator delete (__VA_ARGS__)
+#else
+#	define MT_DEFINE_INLINE_NEW_OPERATOR(classname)													\
+		inline void * classname::operator new (size_t bytes, const char * filename, int line)
+#	define MT_DEFINE_INLINE_DELETE_OPERATOR(classname)												\
+		inline void classname::operator delete (void * pointer, const char * filename, int line)	\
+		{																							\
+			delete (pointer);																		\
+		}																							\
+		inline void classname::operator delete (void * pointer)
 #endif
 
 
@@ -356,7 +407,7 @@ void operator delete [] (void * pointer) noexcept;
 //!
 void operator delete (void * pointer) noexcept
 {
-	MemoryTracker::GetInstance().Untrack(pointer);
+	MemoryTracker::Instance().Untrack(pointer);
 	free(pointer);
 }
 
@@ -365,12 +416,8 @@ void operator delete (void * pointer) noexcept
 //!
 void operator delete [] (void * pointer) noexcept
 {
-	MemoryTracker::GetInstance().Untrack(pointer);
+	MemoryTracker::Instance().Untrack(pointer);
 	free(pointer);
 }
-
-// the memory tracker instance
-MemoryTracker	MemoryTracker::s_Instance;
-bool			MemoryTracker::s_Enabled = true;
 
 #endif
