@@ -2,6 +2,9 @@
 #define POOL_ALLOCATOR_H
 
 
+#include "./MemoryTracker.h"
+
+
 //!
 //! Allocator specialized in allocating 1 type of data. It'll pre-allocate a chunk of memory
 //! and use this pool to avoid allocating/deallocating too many objects. It can also be used
@@ -67,22 +70,17 @@ public:
 	//! Constructor
 	//!
 	PoolAllocator(void)
-		: m_Chunk(new Chunk())
+		: m_Chunk(nullptr)
 		, m_Pointer(nullptr)
 	{
 	}
 
 	//!
-	//! Destructor
+	//! Destructor. This'll call Clear.
 	//!
 	~PoolAllocator(void)
 	{
-		while (m_Chunk != nullptr)
-		{
-			Chunk * previous = m_Chunk->Previous;
-			delete m_Chunk;
-			m_Chunk = previous;
-		}
+		this->Clear();
 	}
 
 	//!
@@ -100,9 +98,9 @@ public:
 		}
 
 		// check if we need to allocate a new chunk
-		if (m_Chunk->Last == m_Chunk->Data + Count)
+		if (m_Chunk == nullptr || m_Chunk->Last == m_Chunk->Data + Count)
 		{
-			Chunk * chunk	= new Chunk();
+			Chunk * chunk	= MT_NEW Chunk();
 			chunk->Previous	= m_Chunk;
 			m_Chunk			= chunk;
 		}
@@ -119,6 +117,19 @@ public:
 		// update the free spot list
 		*reinterpret_cast< Type ** >(pointer) = m_Pointer;
 		m_Pointer = reinterpret_cast< Type * >(pointer);
+	}
+
+	//!
+	//! Clear the allocator
+	//!
+	void Clear(void)
+	{
+		while (m_Chunk != nullptr)
+		{
+			Chunk * previous = m_Chunk->Previous;
+			MT_DELETE m_Chunk;
+			m_Chunk = previous;
+		}
 	}
 
 private:

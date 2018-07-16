@@ -181,3 +181,16 @@ foo = "bar";
 bool baz = foo != "baz";
 bool bar = foo == "bar";
 ```
+
+PoolAllocator
+-------------
+
+Templated class used to create pools of a given type, to avoid allocation costs for small objects, or just to
+ensure that objects of the same type are in a contiguous memory space. Note that the pool allocator is using
+the memory tracker functionalities to track (de)allocation.
+
+```cpp
+PoolAllocator< Foo, 100 > allocator;
+Foo * foo = allocator.Allocate();
+allocator.Deallocate(foo);
+```
