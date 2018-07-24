@@ -54,6 +54,12 @@ class PoolAllocator
 			free(this->Data);
 		}
 
+		//! Util to get the number of bytes used by a chunk
+		constexpr static uint64_t GetMemory(void)
+		{
+			return sizeof(Chunk) + Count * sizeof(Type);
+		}
+
 		//! Previous chunk. nullptr for the first chunk
 		Chunk * Previous;
 
@@ -69,16 +75,18 @@ public:
 	//!
 	//! Constructor
 	//!
-	PoolAllocator(void)
+	inline PoolAllocator(void)
 		: m_Chunk(nullptr)
 		, m_Pointer(nullptr)
+		, m_ObjectCount(0)
+		, m_ChunkCount(0)
 	{
 	}
 
 	//!
 	//! Destructor. This'll call Clear.
 	//!
-	~PoolAllocator(void)
+	inline ~PoolAllocator(void)
 	{
 		this->Clear();
 	}
@@ -88,6 +96,8 @@ public:
 	//!
 	inline Type * Allocate(void)
 	{
+		++m_ObjectCount;
+
 		// check if we have an empty spot
 		if (m_Pointer != nullptr)
 		{
@@ -100,6 +110,7 @@ public:
 		// check if we need to allocate a new chunk
 		if (m_Chunk == nullptr || m_Chunk->Last == m_Chunk->Data + Count)
 		{
+			++m_ChunkCount;
 			Chunk * chunk	= MT_NEW Chunk();
 			chunk->Previous	= m_Chunk;
 			m_Chunk			= chunk;
@@ -114,6 +125,8 @@ public:
 	//!
 	inline void Deallocate(void * pointer)
 	{
+		--m_ObjectCount;
+
 		// update the free spot list
 		*reinterpret_cast< Type ** >(pointer) = m_Pointer;
 		m_Pointer = reinterpret_cast< Type * >(pointer);
@@ -122,14 +135,40 @@ public:
 	//!
 	//! Clear the allocator
 	//!
-	void Clear(void)
+	inline void Clear(void)
 	{
+		m_ObjectCount = 0;
+		m_ChunkCount = 0;
 		while (m_Chunk != nullptr)
 		{
 			Chunk * previous = m_Chunk->Previous;
 			MT_DELETE m_Chunk;
 			m_Chunk = previous;
 		}
+	}
+
+	//!
+	//! Get the total memory used by the allocator in bytes.
+	//!
+	inline uint64_t GetMemory(void) const
+	{
+		return m_ChunkCount * Chunk::GetMemory();
+	}
+
+	//!
+	//! Get the number of allocated objects
+	//!
+	inline uint64_t GetObjectCount(void) const
+	{
+		return m_ObjectCount;
+	}
+
+	//!
+	//! Get the number of chunks
+	//!
+	inline uint64_t GetChunkCount(void) const
+	{
+		return m_ChunkCount;
 	}
 
 private:
@@ -139,6 +178,12 @@ private:
 
 	//! The current pointer
 	Type * m_Pointer;
+
+	//! Total number of allocated objects
+	uint64_t m_ObjectCount;
+
+	//! Number of chunks
+	uint64_t m_ChunkCount;
 
 };
 
