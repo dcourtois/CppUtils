@@ -263,7 +263,7 @@ public:
 	}
 
 	//! get the type of the value
-	inline Type GetType(void)
+	inline Type GetType(void) const
 	{
 		return m_Type;
 	}
@@ -377,6 +377,80 @@ public:
 			case Type::Unsigned:	return m_Data.ui != 0;
 			case Type::Bool:		return m_Data.b;
 			default:				return false;
+		}
+	}
+
+	//! serialize the variant to a binary stream
+	inline void Serialize(std::ostream & output) const
+	{
+		// the type
+		output.write(reinterpret_cast< const char * >(&m_Type), sizeof(m_Type));
+
+		// the value
+		switch (m_Type)
+		{
+			case Type::String:
+			{
+				size_t size = m_Data.s.size();
+				output.write(reinterpret_cast< const char * >(&size), sizeof(size_t));
+				output.write(m_Data.s.data(), size);
+				break;
+			}
+
+			case Type::Double:
+				output.write(reinterpret_cast< const char * >(&m_Data.d), sizeof(double));
+				break;
+
+			case Type::Signed:
+				output.write(reinterpret_cast< const char * >(&m_Data.i), sizeof(int64_t));
+				break;
+
+			case Type::Unsigned:
+				output.write(reinterpret_cast< const char * >(&m_Data.ui), sizeof(uint64_t));
+				break;
+
+			case Type::Bool:
+				output.write(reinterpret_cast< const char * >(&m_Data.b), sizeof(bool));
+				break;
+		}
+	}
+
+	//! deserialize the variant from a binary stream
+	inline void Deserialize(std::istream & output)
+	{
+		// reset
+		this->Reset();
+
+		// the type
+		output.read(reinterpret_cast< char * >(&m_Type), sizeof(m_Type));
+
+		// the value
+		switch (m_Type)
+		{
+			case Type::String:
+			{
+				size_t size = 0;
+				output.read(reinterpret_cast< char * >(&size), sizeof(size_t));
+				m_Data.s.resize(size);
+				output.read(&m_Data.s[0], size);
+				break;
+			}
+
+			case Type::Double:
+				output.read(reinterpret_cast< char * >(&m_Data.d), sizeof(double));
+				break;
+
+			case Type::Signed:
+				output.read(reinterpret_cast< char * >(&m_Data.i), sizeof(int64_t));
+				break;
+
+			case Type::Unsigned:
+				output.read(reinterpret_cast< char * >(&m_Data.ui), sizeof(uint64_t));
+				break;
+
+			case Type::Bool:
+				output.read(reinterpret_cast< char * >(&m_Data.b), sizeof(bool));
+				break;
 		}
 	}
 
