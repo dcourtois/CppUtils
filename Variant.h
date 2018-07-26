@@ -506,4 +506,10 @@ private:
 };
 
 
+//!
+//! Define a vector of variants
+//!
+typedef std::vector< Variant > Variants;
+
+
 #endif // VARIANT_H
