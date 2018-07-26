@@ -75,7 +75,7 @@ public:
 	//!
 	inline void SetThreadLocalStorage(int threadIndex, void * data)
 	{
-		assert(threadIndex >= 0 && threadIndex < static_cast< int >(m_Threads.size()));
+		assert(threadIndex >= 0 && threadIndex < static_cast< int >(m_ThreadLocalStorage.size()));
 		m_ThreadLocalStorage[threadIndex] = data;
 	}
 
@@ -102,7 +102,9 @@ public:
 		if (m_Threads.empty() == true)
 		{
 			// no jobs, just execute the task
-			task(nullptr);
+			++m_RunningTaskCount;
+			task(m_ThreadLocalStorage.front());
+			--m_RunningTaskCount;
 		}
 		else
 		{
@@ -180,7 +182,8 @@ public:
 		m_Threads.clear();
 		m_Threads.reserve(count);
 		m_ThreadLocalStorage.clear();
-		m_ThreadLocalStorage.reserve(count);
+		m_ThreadLocalStorage.resize(count == 0 ? 1 : count);
+		memset(m_ThreadLocalStorage.data(), 0, count * sizeof(void *));
 
 		// restore the stop atomic
 		m_Stop = false;
@@ -188,9 +191,6 @@ public:
 		// create the data
 		for (int i = 0; i < count; ++i)
 		{
-			// create the thread local storage
-			m_ThreadLocalStorage.emplace_back(nullptr);
-
 			// create the thread
 			m_Threads.emplace_back(std::thread([this, i] (void) {
 				// the loop should be going on until the task manager wants to stop, or
