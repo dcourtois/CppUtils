@@ -206,10 +206,12 @@ public:
 						// No task. Allow new ones to be queued
 						m_QueueMutex.unlock();
 
-						// and wait for something to do (we use a predicate to only wait
-						// if the task manager has not been stopped)
+						// and wait for something to do
 						std::unique_lock< std::mutex > uniqueLock(m_ConditionVariableMutex);
-						m_ConditionVariable.wait(uniqueLock);
+						if (m_Stop == false)
+						{
+							m_ConditionVariable.wait(uniqueLock);
+						}
 
 						// once activated, we want to go back to the beginning of the loop
 						// to lock again the queue's mutex and check the queue, etc.
