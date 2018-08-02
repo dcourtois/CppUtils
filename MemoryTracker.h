@@ -386,9 +386,9 @@ void operator delete [] (void * pointer) noexcept;
 #	define MT_DEFINE_INLINE_NEW_OPERATOR(classname)													\
 		inline void * classname::operator new (size_t bytes, const char * filename, int line)
 #	define MT_DEFINE_INLINE_DELETE_OPERATOR(classname)												\
-		inline void classname::operator delete (void * pointer, const char * filename, int line)	\
+		inline void classname::operator delete (void * pointer, const char *, int)					\
 		{																							\
-			classname::operator delete (pointer);																		\
+			classname::operator delete (pointer);													\
 		}																							\
 		inline void classname::operator delete (void * pointer)
 #endif
