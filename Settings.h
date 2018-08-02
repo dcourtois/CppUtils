@@ -232,7 +232,7 @@ public:
 	//!
 	template< typename Type > inline Type Get(const std::string & name, const Type & def)
 	{
-		return m_Disabled == true ? TypeTraits< Type >::FromVariants(this->GetSetting(name).Values, def) : def;
+		return m_Disabled == false ? TypeTraits< Type >::FromVariants(this->GetSetting(name).Values, def) : def;
 	}
 
 	//!
