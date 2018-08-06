@@ -412,6 +412,9 @@ public:
 			case Type::Bool:
 				output.write(reinterpret_cast< const char * >(&m_Data.b), sizeof(bool));
 				break;
+
+			default:
+				break;
 		}
 	}
 
@@ -450,6 +453,9 @@ public:
 
 			case Type::Bool:
 				output.read(reinterpret_cast< char * >(&m_Data.b), sizeof(bool));
+				break;
+
+			default:
 				break;
 		}
 	}

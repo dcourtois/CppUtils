@@ -84,7 +84,7 @@ public:
 		//!
 		static inline Type FromVariants(const Variants & variants, const Type & def)
 		{
-			return variants.size() == 1 ? variants[0] : def;
+			return variants.size() == 1 ? static_cast< Type >(variants[0]) : def;
 		}
 
 		//!

@@ -43,7 +43,7 @@ class PoolAllocator
 			, Data(nullptr)
 			, Last(nullptr)
 		{
-			this->Data = reinterpret_cast< Type * >(malloc(Count * sizeof(Type)));
+			this->Data = reinterpret_cast< char * >(malloc(Count * sizeof(Type)));
 			memset(this->Data, 0, Count * sizeof(Type));
 			this->Last = this->Data;
 		}
@@ -64,10 +64,10 @@ class PoolAllocator
 		Chunk * Previous;
 
 		//! The allocated data
-		Type * Data;
+		char * Data;
 
 		//! The last chunk of this chunk
-		Type * Last;
+		char * Last;
 	};
 
 public:
@@ -108,7 +108,7 @@ public:
 		}
 
 		// check if we need to allocate a new chunk
-		if (m_Chunk == nullptr || m_Chunk->Last == m_Chunk->Data + Count)
+		if (m_Chunk == nullptr || m_Chunk->Last == m_Chunk->Data + Count * sizeof(Type))
 		{
 			++m_ChunkCount;
 			Chunk * chunk	= MT_NEW Chunk();
@@ -117,7 +117,9 @@ public:
 		}
 
 		// return the pointer
-		return m_Chunk->Last++;
+		Type * pointer = reinterpret_cast< Type * >(m_Chunk->Last);
+		m_Chunk->Last += sizeof(Type);
+		return pointer;
 	}
 
 	//!
