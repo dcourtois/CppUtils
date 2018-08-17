@@ -27,6 +27,7 @@ namespace Profiler
 #include <mutex>
 #include <fstream>
 #include <algorithm>
+#include <unordered_map>
 
 
 namespace Profiler
@@ -103,18 +104,18 @@ namespace Profiler
 		inline void Raw(const String & filename)
 		{
 			// first, ensure that nobody else is modifying the profiling data
-			ScopedLock< Mutex > lockMarkers(MarkerMutex);
-			ScopedLock< Mutex > lockScopes(ScopeMutex);
+			ScopedLock< Mutex > lockMarkers(Data->MarkerMutex);
+			ScopedLock< Mutex > lockScopes(Data->ScopeMutex);
 
 			// open the output file
 			std::ofstream file(filename, std::ios::binary | std::ios::out);
 
 			// Write the start time
-			Write(file, Start);
+			Write(file, Data->StartTime);
 
 			// write the scopes
-			Write(file, Scopes.size());
-			for (const auto & scope : Scopes)
+			Write(file, Data->Scopes.size());
+			for (const auto & scope : Data->Scopes)
 			{
 				Write(file, scope.Filename);
 				Write(file, scope.Name);
@@ -122,8 +123,8 @@ namespace Profiler
 			}
 
 			// write the markers
-			Write(file, MarkerLists.size());
-			for (const auto * markers : MarkerLists)
+			Write(file, Data->MarkerLists.size());
+			for (const auto * markers : Data->MarkerLists)
 			{
 				Write(file, markers->size());
 				Write(file, markers->data(), markers->size());
@@ -136,8 +137,8 @@ namespace Profiler
 		inline void CommaSeparatedValues(const String & filename)
 		{
 			// first, ensure that nobody else is modifying the profiling data
-			ScopedLock< Mutex > lockMarkers(MarkerMutex);
-			ScopedLock< Mutex > lockScopes(ScopeMutex);
+			ScopedLock< Mutex > lockMarkers(Data->MarkerMutex);
+			ScopedLock< Mutex > lockScopes(Data->ScopeMutex);
 
 			// open the output file
 			std::ofstream file(filename, std::ios::binary | std::ios::out);
@@ -146,10 +147,10 @@ namespace Profiler
 			std::unordered_map< ThreadID, std::pair< TimePoint, TimePoint > > timeRanges;
 			TimePoint min = GetCurrentTime();
 			TimePoint max;
-			std::vector< uint64_t > inclusive(Scopes.size(), 0);
-			std::vector< int64_t > exclusive(Scopes.size(), 0);
-			std::vector< uint64_t > counts(Scopes.size(), 0);
-			for (const auto * markers : MarkerLists)
+			std::vector< uint64_t > inclusive(Data->Scopes.size(), 0);
+			std::vector< int64_t > exclusive(Data->Scopes.size(), 0);
+			std::vector< uint64_t > counts(Data->Scopes.size(), 0);
+			for (const auto * markers : Data->MarkerLists)
 			{
 				for (const auto & marker : *markers)
 				{
@@ -190,17 +191,20 @@ namespace Profiler
 
 			// output summary
 			file << "name;counts;inclusive total;exclusive total;inclusive average;exclusive average;inclusive percentage;exclusive percentage" << std::endl;
-			for (size_t i = 0, iend = Scopes.size(); i < iend; ++i)
+			for (size_t i = 0, iend = Data->Scopes.size(); i < iend; ++i)
 			{
-				file << Scopes[i].Name <<
-					";" << counts[i] <<
-					";" << GetReadableTime(inclusive[i]) <<
-					";" << GetReadableTime(exclusive[i]) <<
-					";" << GetReadableTime(inclusive[i] / counts[i]) <<
-					";" << GetReadableTime(exclusive[i] / counts[i]) <<
-					";" << GetDouble((100.0 * inclusive[i]) / double(execTime), 2) << " %" <<
-					";" << GetDouble((100.0 * exclusive[i]) / double(execTime), 2) << " %" <<
-					std::endl;
+				if (counts[i] != 0)
+				{
+					file << Data->Scopes[i].Name <<
+						";" << counts[i] <<
+						";" << GetReadableTime(inclusive[i]) <<
+						";" << GetReadableTime(exclusive[i]) <<
+						";" << GetReadableTime(inclusive[i] / counts[i]) <<
+						";" << GetReadableTime(exclusive[i] / counts[i]) <<
+						";" << GetDouble((100.0 * inclusive[i]) / double(execTime), 2) << " %" <<
+						";" << GetDouble((100.0 * exclusive[i]) / double(execTime), 2) << " %" <<
+						std::endl;
+				}
 			}
 		}
 
@@ -213,8 +217,8 @@ namespace Profiler
 		inline void ChromeTracing(const String & filename)
 		{
 			// first, ensure that nobody else is modifying the profiling data
-			ScopedLock< Mutex > lockMarkers(MarkerMutex);
-			ScopedLock< Mutex > lockScopes(ScopeMutex);
+			ScopedLock< Mutex > lockMarkers(Data->MarkerMutex);
+			ScopedLock< Mutex > lockScopes(Data->ScopeMutex);
 
 			// open the output file
 			std::ofstream file(filename);
@@ -222,11 +226,11 @@ namespace Profiler
 
 			// and write data
 			bool first = true;
-			for (const auto * markers : MarkerLists)
+			for (const auto * markers : Data->MarkerLists)
 			{
 				for (const auto & marker : *markers)
 				{
-					const ScopeData & scope = Scopes[marker.Scope];
+					const ScopeData & scope = Data->Scopes[marker.Scope];
 					String scopeFilename = scope.Filename;
 					std::replace(scopeFilename.begin(), scopeFilename.end(), '\\', '/');
 					if (first == false)
@@ -241,7 +245,7 @@ namespace Profiler
 					file << "{ \"cat\": \"perf\", \"ph\": \"X\", \"pid\": \"foo\", ";
 					file << "\"name\": \"" << scope.Name << "\", ";
 					file << "\"tid\": " << marker.Thread << ", ";
-					file << "\"ts\": " << GetMicroSeconds(Start, marker.Start) << ", ";
+					file << "\"ts\": " << GetMicroSeconds(Data->StartTime, marker.Start) << ", ";
 					file << "\"dur\": " << GetMicroSeconds(marker.Start, marker.End) << ", ";
 					file << "\"args\": { \"filename\": \"" << scopeFilename << "\", \"line\": " << scope.Line << " } }";
 				}

@@ -96,20 +96,38 @@ namespace Profiler
 	//! Define a dynamically allocated vector
 	template < typename Type > using Vector = std::vector< Type >;
 
-	//! The profiling start point
-	extern const TimePoint Start;
+	//! Data that might need to be shared
+	struct SharedData
+	{
+		//! Constructor
+		inline SharedData(void)
+			: Started(true)
+			, StartTime(GetCurrentTime())
+		{
+		}
 
-	//! The list of registered scopes
-	extern Vector< ScopeData > Scopes;
+		//! If false, stops collecting profiling data
+		bool Started;
 
-	//! Mutex to protect scope vector access
-	extern Mutex ScopeMutex;
+		//! The profiling starting point
+		TimePoint StartTime;
 
-	//! The global marker lists
-	extern Vector< Vector< MarkerData > * > MarkerLists;
+		//! The list of registered scopes
+		Vector< ScopeData > Scopes;
 
-	//! Mutex to protect Markers access
-	extern Mutex MarkerMutex;
+		//! Mutex to protect scope vector access
+		Mutex ScopeMutex;
+
+		//! The global marker lists
+		Vector< Vector< MarkerData > * > MarkerLists;
+
+		//! Mutex to protect Markers access
+		Mutex MarkerMutex;
+
+	};
+
+	//! The data
+	extern SharedData * Data;
 
 	//! The "per-thread" marker lists
 	extern thread_local MarkerList Markers;
@@ -168,25 +186,67 @@ namespace Profiler
 		//! to the global list of marker lists
 		//!
 		inline MarkerList(void)
-			: Data(new Vector< MarkerData >())
+			: List(new Vector< MarkerData >())
 		{
-			ScopedLock< Mutex > lock(MarkerMutex);
-			MarkerLists.push_back(Data);
+			List->reserve(10000000);
+			ScopedLock< Mutex > lock(Data->MarkerMutex);
+			Data->MarkerLists.push_back(List);
 		}
 
-		//! The markers
-		Vector< MarkerData > * Data;
+		//! The marker list
+		Vector< MarkerData > * List;
 
 	};
+
+	//!
+	//! Set shared data. This can be used to profile code from multiple shared libraries.
+	//!
+	void SetSharedData(SharedData * data);
+
+	//!
+	//! If the profiler started ?
+	//!
+	inline bool IsStarted(void)
+	{
+		return Data->Started;
+	}
+
+	//!
+	//! Starts the profiler
+	//!
+	inline void Start(void)
+	{
+		Data->StartTime = GetCurrentTime();
+		Data->Started = true;
+	}
+
+	//!
+	//! Stop the profiler
+	//!
+	inline void Stop(void)
+	{
+		Data->Started = false;
+	}
+
+	//!
+	//! Clear the profiler data
+	//!
+	inline void Clear(void)
+	{
+		for (auto * markers : Data->MarkerLists)
+		{
+			markers->clear();
+		}
+	}
 
 	//!
 	//! Register a new scope
 	//!
 	inline ScopeID RegisterScope(String && name, String && filename, uint32_t line)
 	{
-		ScopedLock< Mutex > lock(ScopeMutex);
-		Scopes.push_back({ name, filename, line });
-		return static_cast< ScopeID >(Scopes.size() - 1);
+		ScopedLock< Mutex > lock(Data->ScopeMutex);
+		Data->Scopes.push_back({ name, filename, line });
+		return static_cast< ScopeID >(Data->Scopes.size() - 1);
 	}
 
 	//!
@@ -201,12 +261,18 @@ namespace Profiler
 		//! Constructor
 		//!
 		inline ProfileScope(ScopeID scope)
-			: m_ParentScope(CurrentScope)
+			: m_Enabled(Data->Started)
+			, m_ParentScope(CurrentScope)
 			, m_Scope(scope)
-			, m_Thread(GetCurrentThreadID())
-			, m_Start(GetCurrentTime())
 		{
-			// update the current scope
+			// if we're not enabled, do not waste time
+			if (m_Enabled == true)
+			{
+				m_Thread	= GetCurrentThreadID();
+				m_Start		= GetCurrentTime();
+			}
+
+			// update current scope
 			CurrentScope = scope;
 		}
 
@@ -216,19 +282,25 @@ namespace Profiler
 		inline ~ProfileScope(void)
 		{
 			// add the marker
-			Markers.Data->push_back({
-				m_ParentScope,
-				m_Scope,
-				m_Thread,
-				m_Start,
-				GetCurrentTime()
-			});
+			if (m_Enabled == true)
+			{
+				Markers.List->push_back({
+					m_ParentScope,
+					m_Scope,
+					m_Thread,
+					m_Start,
+					GetCurrentTime()
+				});
+			}
 
 			// restore the previous scope
 			CurrentScope = m_ParentScope;
 		}
 
 	private:
+
+		//! Enabled state of the profiler when the scope was entered
+		bool m_Enabled;
 
 		//! Parent scope ID
 		ScopeID m_ParentScope;
@@ -252,9 +324,29 @@ namespace Profiler
 
 #if PROFILER_ENABLE == 1
 
+//!
+//! @def PROFILER_START()
+//!
+//! Start (enable) the profiler. It will initialize the start time.
+//!
+#define PROFILER_START() Profiler::Start()
 
 //!
-//! @def PROFILE_FUNCTION
+//! @def PROFILER_STOP()
+//!
+//! Stop (disable) the profiler. It will stop collecting markers.
+//!
+#define PROFILER_STOP() Profiler::Stop()
+
+//!
+//! @def PROFILER_CLEAR()
+//!
+//! Clear the profiler data. This will only remove the markers.
+//!
+#define PROFILER_CLEAR() Profiler::Clear()
+
+//!
+//! @def PROFILE_FUNCTION()
 //!
 //! Use this macro at the begining of a function to profile it.
 //!
@@ -292,6 +384,9 @@ namespace Profiler
 #else // PROFILER_ENABLE == 0
 
 
+#	define PROFILER_START()			(void)0
+#	define PROFILER_STOP()			(void)0
+#	define PROFILER_CLEAR()			(void)0
 #	define PROFILE_FUNCTION()		(void)0
 #	define PROFILE_SCOPE(name)		(void)0
 
@@ -316,13 +411,46 @@ namespace Profiler
 namespace Profiler
 {
 
-	const TimePoint Start = GetCurrentTime();
-	Vector< ScopeData > Scopes;
-	Mutex ScopeMutex;
-	Vector< Vector< MarkerData > * > MarkerLists;
-	Mutex MarkerMutex;
-	thread_local MarkerList Markers;
-	thread_local ScopeID CurrentScope = static_cast< ScopeID >(-1);
+	SharedData					_Data;
+	SharedData *				Data			= &_Data;
+	thread_local MarkerList		Markers;
+	thread_local ScopeID		CurrentScope	= static_cast< ScopeID >(-1);
+
+	void SetSharedData(SharedData * data)
+	{
+		if (Data == data)
+		{
+			return;
+		}
+
+		// override the data
+		Data = data;
+
+		// merge marker lists
+		{
+			ScopedLock< Mutex > lock(Data->MarkerMutex);
+
+			// remap the markers' scope IDs
+			ScopeID scopeOffset = static_cast< ScopeID >(Data->Scopes.size());
+			for (Vector< MarkerData > * markers : _Data.MarkerLists)
+			{
+				for (MarkerData & marker : *markers)
+				{
+					marker.Scope += scopeOffset;
+					marker.ParentScope += scopeOffset;
+				}
+			}
+
+			// add the markers
+			Data->MarkerLists.insert(Data->MarkerLists.end(), _Data.MarkerLists.begin(), _Data.MarkerLists.end());
+		}
+
+		// merge scopes
+		{
+			ScopedLock< Mutex > lock(Data->ScopeMutex);
+			Data->Scopes.insert(Data->Scopes.end(), _Data.Scopes.begin(), _Data.Scopes.end());
+		}
+	}
 
 } // namespace Profiler
 
