@@ -182,6 +182,30 @@ bool baz = foo != "baz";
 bool bar = foo == "bar";
 ```
 
+Settings
+--------
+
+This one is a class which handles loading / saving settings, taking care of removing the ones that are no longer accessed.
+
+
+```cpp
+// create the class and load things.
+Settings settings("config.bin");
+settings.Load();
+
+// load stuff (second argument is a default value used if the setting doesn't exist)
+double value = settings.Get("some.double", -1.0);
+
+// write stuff (overwrite existing settings, create new ones)
+settings.Set("some.double", 10.0);
+
+// save the updated settings. Note that every setting which hasn't been used (either by Set or Get)
+// since the Load call will not be saved. So you might want to create a single global instance for
+// you whole app.
+settings.Save();
+
+```
+
 PoolAllocator
 -------------
 
