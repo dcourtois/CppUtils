@@ -25,6 +25,7 @@ public:
 		Signed,			//!< int64_t
 		Unsigned,		//!< uint64_t
 		Bool,			//!< bool
+		Void,			//!< pointer
 		None,			//!< not set
 	};
 
@@ -104,6 +105,13 @@ public:
 	{
 	}
 
+	//! pointer constructor
+	inline Variant(const void * value)
+		: m_Type(Type::Void)
+		, m_Data(value)
+	{
+	}
+
 	//! copy constructor
 	inline Variant(const Variant & other)
 		: m_Type(other.m_Type)
@@ -115,6 +123,7 @@ public:
 			case Type::Signed:		m_Data.i = other.m_Data.i;						break;
 			case Type::Unsigned:	m_Data.ui = other.m_Data.ui;					break;
 			case Type::Bool:		m_Data.b = other.m_Data.b;						break;
+			case Type::Void:		m_Data.v = other.m_Data.v;						break;
 			case Type::None:		break;
 		}
 	}
@@ -130,6 +139,7 @@ public:
 			case Type::Signed:		m_Data.i = other.m_Data.i;								break;
 			case Type::Unsigned:	m_Data.ui = other.m_Data.ui;							break;
 			case Type::Bool:		m_Data.b = other.m_Data.b;								break;
+			case Type::Void:		m_Data.v = other.m_Data.v;								break;
 			case Type::None:		break;
 		}
 	}
@@ -243,6 +253,14 @@ public:
 		return *this;
 	}
 
+	//! assignment operator
+	inline Variant & operator = (const void * other)
+	{
+		this->~Variant();
+		new (this) Variant(other);
+		return *this;
+	}
+
 	//! equality operator
 	template< typename T > inline bool operator == (T other) const
 	{
@@ -278,6 +296,7 @@ public:
 			case Type::Signed:		return std::to_string(m_Data.i);
 			case Type::Unsigned:	return std::to_string(m_Data.ui);
 			case Type::Bool:		return m_Data.b == true ? "1" : "0";
+			case Type::Void:		return std::to_string(reinterpret_cast< size_t >(m_Data.v));
 			default:				return "";
 		}
 	}
@@ -292,6 +311,7 @@ public:
 			case Type::Signed:		return static_cast< double >(m_Data.i);
 			case Type::Unsigned:	return static_cast< double >(m_Data.ui);
 			case Type::Bool:		return m_Data.b == true ? 1.0 : 0.0;
+			case Type::Void:		assert(false && "unsupported conversion"); return 0.0;
 			default:				return 0.0;
 		}
 	}
@@ -306,6 +326,7 @@ public:
 			case Type::Signed:		return static_cast< float >(m_Data.i);
 			case Type::Unsigned:	return static_cast< float >(m_Data.ui);
 			case Type::Bool:		return m_Data.b == true ? 1.0f : 0.0f;
+			case Type::Void:		assert(false && "unsupported conversion"); return 0.0f;
 			default:				return 0.0f;
 		}
 	}
@@ -320,6 +341,7 @@ public:
 			case Type::Signed:		return m_Data.i;
 			case Type::Unsigned:	return static_cast< int64_t >(m_Data.ui);
 			case Type::Bool:		return m_Data.b == true ? 1 : 0;
+			case Type::Void:		return reinterpret_cast< int64_t >(m_Data.v);
 			default:				return 0;
 		}
 	}
@@ -334,6 +356,7 @@ public:
 			case Type::Signed:		return static_cast< int >(m_Data.i);
 			case Type::Unsigned:	return static_cast< int >(m_Data.ui);
 			case Type::Bool:		return m_Data.b == true ? 1 : 0;
+			case Type::Void:		return static_cast< int >(reinterpret_cast< size_t >(m_Data.v));
 			default:				return 0;
 		}
 	}
@@ -348,6 +371,7 @@ public:
 			case Type::Signed:		return static_cast< int >(m_Data.i);
 			case Type::Unsigned:	return m_Data.ui;
 			case Type::Bool:		return m_Data.b == true ? 1 : 0;
+			case Type::Void:		return reinterpret_cast< uint64_t >(m_Data.v);
 			default:				return 0;
 		}
 	}
@@ -362,6 +386,7 @@ public:
 			case Type::Signed:		return static_cast< unsigned int >(m_Data.i);
 			case Type::Unsigned:	return static_cast< unsigned int >(m_Data.ui);
 			case Type::Bool:		return m_Data.b == true ? 1 : 0;
+			case Type::Void:		return static_cast< unsigned int >(reinterpret_cast< size_t >(m_Data.v));
 			default:				return 0;
 		}
 	}
@@ -376,6 +401,22 @@ public:
 			case Type::Signed:		return m_Data.i != 0;
 			case Type::Unsigned:	return m_Data.ui != 0;
 			case Type::Bool:		return m_Data.b;
+			case Type::Void:		return m_Data.v != nullptr;
+			default:				return false;
+		}
+	}
+
+	//! convert to const void *
+	inline operator const void * (void) const
+	{
+		switch (m_Type)
+		{
+			case Type::String:		return m_Data.s.c_str();
+			case Type::Double:		return reinterpret_cast< const void * >(*reinterpret_cast< const uint64_t * >(&m_Data.d));
+			case Type::Signed:		return reinterpret_cast< const void * >(m_Data.i);
+			case Type::Unsigned:	return reinterpret_cast< const void * >(m_Data.i);
+			case Type::Bool:		return reinterpret_cast< const void * >(static_cast< uint64_t >(m_Data.b == true ? 1 : 0));
+			case Type::Void:		return m_Data.v;
 			default:				return false;
 		}
 	}
@@ -411,6 +452,10 @@ public:
 
 			case Type::Bool:
 				output.write(reinterpret_cast< const char * >(&m_Data.b), sizeof(bool));
+				break;
+
+			case Type::Void:
+				output.write(reinterpret_cast< const char * >(&m_Data.v), sizeof(void *));
 				break;
 
 			default:
@@ -455,6 +500,10 @@ public:
 				output.read(reinterpret_cast< char * >(&m_Data.b), sizeof(bool));
 				break;
 
+			case Type::Void:
+				output.read(reinterpret_cast< char * >(&m_Data.v), sizeof(void *));
+				break;
+
 			default:
 				break;
 		}
@@ -483,6 +532,9 @@ private:
 		// bool data
 		bool b;
 
+		// pointer data
+		const void * v;
+
 		//! default empty constructor
 		inline Data(void) {}
 
@@ -503,6 +555,9 @@ private:
 
 		//! bool construct
 		inline Data(bool value) : b(value) {}
+
+		//! pointer construct
+		inline Data(const void * value) : v(value) {}
 
 		//! default empty destructor
 		inline ~Data(void) {}
