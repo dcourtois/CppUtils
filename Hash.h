@@ -46,6 +46,19 @@ namespace Hash
 	}
 
 	//!
+	//! Helper to combine more than 2 values
+	//!
+	inline uint32_t Combine(std::initializer_list< uint32_t > hashes)
+	{
+		assert(hashes.size() > 2);
+		unsigned int key = *hashes.begin();
+		for (auto i = hashes.begin() + 1, iend = hashes.end(); i != iend; ++i) {
+			key = Combine(key, *i);
+		}
+		return key;
+	}
+
+	//!
 	//! Implementation detail namespace for static (compile time) hash
 	//!
 	namespace Detail
