@@ -125,6 +125,14 @@ public:
 	}
 
 	//!
+	//! Get the current number of queued tasks
+	//!
+	inline int GetTaskCount(void) const
+	{
+		return m_QueuedTaskCount;
+	}
+
+	//!
 	//! Set the number of threads.
 	//!
 	//! @param count
