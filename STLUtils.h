@@ -54,8 +54,23 @@ void Remove(ContainerType & container, const Type & item)
 template< typename ContainerType, typename Type >
 int IndexOf(const ContainerType & container, const Type & element)
 {
-	auto iterator = Find(container, element);
+	auto iterator = std::find(container.begin(), container.end(), element);
 	return iterator == container.end() ? -1 : int(std::distance(container.begin(), iterator));
+}
+
+//!
+//! Sort a container using a functor.
+//!
+//! @param container
+//!		The container.
+//!
+//! @param functor
+//!		The functor. Can be a lambda, std::function, etc.
+//!
+template< typename ContainerType, typename Functor >
+void Sort(ContainerType & container, const Functor & functor)
+{
+	std::sort(container.begin(), container.end(), functor);
 }
 
 
