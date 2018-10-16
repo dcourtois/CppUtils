@@ -336,6 +336,37 @@ void operator delete [] (void * pointer) noexcept;
 //!
 #define MT_GET_ALLOCATED_CHUNKS() MemoryTracker::Instance().GetTrackedChunks()
 
+//!
+//! @def MT_SHUTDOWN(log)
+//!		This can be called when you're leaving your application to disable memory
+//!		tracking, and logging a report that will tell you if there are still some
+//!		memory chunks allocated or not, and if there are, where the allocation was.
+//!		You just have to provide a @a log function that works like printf.
+//!
+#define MT_SHUTDOWN(log)																									\
+	MemoryTracker::Instance().SetEnabled(false);																			\
+	auto chunks = MemoryTracker::Instance().GetTrackedChunks();																\
+	if (chunks.empty() == true)																								\
+	{																														\
+		log("No memory leaks, congratulations !\n");																		\
+	}																														\
+	else																													\
+	{																														\
+		log("Memory leak detected - %llu block%s still allocated :\n", chunks.size(), chunks.size() > 1 ? "s" : "");		\
+		for (const auto & entry : chunks)																					\
+		{																													\
+			log(																											\
+				"%s(%d): [%lli] %llu bytes at location %p\n",																\
+				entry.second.Filename,																						\
+				entry.second.Line,																							\
+				entry.second.AllocationID,																					\
+				entry.second.Bytes,																							\
+				entry.first																									\
+			);																												\
+		}																													\
+	}
+
+
 #else
 
 #	define MT_NEW						new
@@ -345,6 +376,7 @@ void operator delete [] (void * pointer) noexcept;
 #	define MT_BREAK_ON_ALLOC(count)		(void)0
 #	define MT_GET_ALLOCATED_MEMORY()	0
 #	define MT_GET_ALLOCATED_CHUNKS()	0
+#	define MT_SHUTDOWN(log)				(void)0
 
 #endif
 
