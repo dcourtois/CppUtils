@@ -417,7 +417,7 @@ public:
 			case Type::Unsigned:	return reinterpret_cast< const void * >(m_Data.i);
 			case Type::Bool:		return reinterpret_cast< const void * >(static_cast< uint64_t >(m_Data.b == true ? 1 : 0));
 			case Type::Void:		return m_Data.v;
-			default:				return false;
+			default:				return nullptr;
 		}
 	}
 
