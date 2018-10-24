@@ -32,6 +32,7 @@ public:
 	//! default empty constructor
 	inline Variant(void)
 		: m_Type(Type::None)
+		, m_Data{}
 	{
 	}
 
@@ -197,64 +198,8 @@ public:
 		return *this;
 	}
 
-	//! assignment operator
-	inline Variant & operator = (double other)
-	{
-		this->~Variant();
-		new (this) Variant(other);
-		return *this;
-	}
-
-	//! assignment operator
-	inline Variant & operator = (float other)
-	{
-		this->~Variant();
-		new (this) Variant(static_cast< double >(other));
-		return *this;
-	}
-
-	//! assignment operator
-	inline Variant & operator = (int64_t other)
-	{
-		this->~Variant();
-		new (this) Variant(other);
-		return *this;
-	}
-
-	//! assignment operator
-	inline Variant & operator = (int other)
-	{
-		this->~Variant();
-		new (this) Variant(static_cast< int64_t >(other));
-		return *this;
-	}
-
-	//! assignment operator
-	inline Variant & operator = (uint64_t other)
-	{
-		this->~Variant();
-		new (this) Variant(other);
-		return *this;
-	}
-
-	//! assignment operator
-	inline Variant & operator = (unsigned int other)
-	{
-		this->~Variant();
-		new (this) Variant(static_cast< uint64_t >(other));
-		return *this;
-	}
-
-	//! assignment operator
-	inline Variant & operator = (bool other)
-	{
-		this->~Variant();
-		new (this) Variant(other);
-		return *this;
-	}
-
-	//! assignment operator
-	inline Variant & operator = (const void * other)
+	//! template assignment operator
+	template< typename T > inline Variant & operator = (T other)
 	{
 		this->~Variant();
 		new (this) Variant(other);
@@ -319,16 +264,7 @@ public:
 	//! convert to float
 	inline operator float (void) const
 	{
-		switch (m_Type)
-		{
-			case Type::String:		return 0.0f;
-			case Type::Double:		return static_cast< float >(m_Data.d);
-			case Type::Signed:		return static_cast< float >(m_Data.i);
-			case Type::Unsigned:	return static_cast< float >(m_Data.ui);
-			case Type::Bool:		return m_Data.b == true ? 1.0f : 0.0f;
-			case Type::Void:		assert(false && "unsupported conversion"); return 0.0f;
-			default:				return 0.0f;
-		}
+		return static_cast< float >(static_cast< double >(*this));
 	}
 
 	//! convert to int64_t
@@ -349,16 +285,7 @@ public:
 	//! convert to int
 	inline operator int (void) const
 	{
-		switch (m_Type)
-		{
-			case Type::String:		return static_cast< int >(std::atoll(m_Data.s.c_str()));
-			case Type::Double:		return static_cast< int >(m_Data.d);
-			case Type::Signed:		return static_cast< int >(m_Data.i);
-			case Type::Unsigned:	return static_cast< int >(m_Data.ui);
-			case Type::Bool:		return m_Data.b == true ? 1 : 0;
-			case Type::Void:		return static_cast< int >(reinterpret_cast< size_t >(m_Data.v));
-			default:				return 0;
-		}
+		return static_cast< int >(static_cast< int64_t >(*this));
 	}
 
 	//! convert to uint64_t
@@ -379,16 +306,7 @@ public:
 	//! convert to unsigned int
 	inline operator unsigned int (void) const
 	{
-		switch (m_Type)
-		{
-			case Type::String:		return static_cast< unsigned int >(std::atoll(m_Data.s.c_str()));
-			case Type::Double:		return static_cast< unsigned int >(m_Data.d);
-			case Type::Signed:		return static_cast< unsigned int >(m_Data.i);
-			case Type::Unsigned:	return static_cast< unsigned int >(m_Data.ui);
-			case Type::Bool:		return m_Data.b == true ? 1 : 0;
-			case Type::Void:		return static_cast< unsigned int >(reinterpret_cast< size_t >(m_Data.v));
-			default:				return 0;
-		}
+		return static_cast< unsigned int >(static_cast< uint64_t >(*this));
 	}
 
 	//! convert to bool
@@ -537,6 +455,9 @@ private:
 
 		//! default empty constructor
 		inline Data(void) {}
+
+		//! string constructor
+		inline Data(const char * value) : s(value) {}
 
 		//! string constructor
 		inline Data(const std::string & value) : s(value) {}
