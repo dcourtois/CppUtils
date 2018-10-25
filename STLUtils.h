@@ -73,5 +73,21 @@ void Sort(ContainerType & container, const Functor & functor)
 	std::sort(container.begin(), container.end(), functor);
 }
 
+//!
+//! Sleep the current thread for a given number of micro seconds
+//!
+inline void SleepForUs(int us)
+{
+	std::this_thread::sleep_for(std::chrono::microseconds(us));
+}
+
+//!
+//! Sleep the current thread for a given number of milli seconds
+//!
+inline void SleepForMs(int ms)
+{
+	std::this_thread::sleep_for(std::chrono::milliseconds(ms));
+}
+
 
 #endif // STL_UTILS_H
