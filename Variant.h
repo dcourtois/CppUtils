@@ -494,4 +494,28 @@ private:
 typedef std::vector< Variant > Variants;
 
 
+//!
+//! Helper used to convert a concrete type into a variant list. You can create specializations
+//! for your custom types.
+//!
+template< typename T > Variants ToVariants(T value)
+{
+	return { value };
+}
+
+//!
+//! Helper used to convert many values into variant lists, and pack them all into a single
+//! variant list.
+//!
+template< typename T, typename ...Ts > inline Variants ToVariants(T first, Ts... zeRest)
+{
+	Variants variants = ToVariants(first);
+	for (Variant & variant : ToVariants(zeRest...))
+	{
+		variants.push_back(std::move(variant));
+	}
+	return variants;
+}
+
+
 #endif // VARIANT_H
