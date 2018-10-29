@@ -231,6 +231,18 @@ public:
 		return m_Type;
 	}
 
+	//! returns true if the type is numerical (either Signed, Unsigned or Double)
+	inline bool IsTypeNum(void) const
+	{
+		return m_Type == Type::Signed || m_Type == Type::Unsigned || m_Type == Type::Double;
+	}
+
+	//! returns true if the type is integer (either Signed or Unsigned)
+	inline bool IsTypeInt(void) const
+	{
+		return m_Type == Type::Signed || m_Type == Type::Unsigned;
+	}
+
 	//! convert to std::string
 	inline operator std::string (void) const
 	{
