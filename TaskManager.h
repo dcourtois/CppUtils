@@ -90,8 +90,8 @@ public:
 	//!
 	inline void PushTask(Task && task)
 	{
-		// do nothing if we're stopping
-		if (m_State == State::Stopping)
+		// do nothing if we're not running
+		if (m_State != State::Running)
 		{
 			return;
 		}
@@ -169,7 +169,7 @@ public:
 		m_ThreadLocalStorage.resize(count == 0 ? 1 : count);
 		memset(m_ThreadLocalStorage.data(), 0, m_ThreadLocalStorage.size() * sizeof(void *));
 
-		// set the state as paused to allow queue'ing again while we're creating the threads
+		// set the state as paused while we start the threads
 		m_State = State::Paused;
 
 		// create the threads
@@ -194,10 +194,6 @@ public:
 						++m_PausedThreadCount;
 						m_ConditionVariable.wait(uniqueLock);
 						--m_PausedThreadCount;
-
-						// once activated, we want to go back to the beginning of the loop
-						// to lock again the queue's mutex and check the queue, etc.
-						continue;
 					}
 					else
 					{
@@ -211,9 +207,6 @@ public:
 						task(m_ThreadLocalStorage[i]);
 					}
 				}
-				
-				// Wait is checking this, so update it even if the thread is not technically paused
-				++m_PausedThreadCount;
 			}));
 		}
 
@@ -239,8 +232,10 @@ public:
 	//!
 	inline void Cancel(void)
 	{
+		m_State = State::Paused;
 		this->EmptyQueue();
 		this->Wait();
+		m_State = State::Running;
 	}
 
 private:
