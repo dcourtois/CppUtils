@@ -42,67 +42,6 @@ public:
 	}
 
 	//!
-	//! This is used to convert data between concrete types and variants
-	//! You can specialize this for your types to let the Settings class
-	//! handle them.
-	//!
-	//! @code{.cpp}
-	//!
-	//!	// specialization for a Vector4 type
-	//!	template< > struct Settings::TypeTraits< Vector4 >
-	//!	{
-	//!		static inline Vector4 FromVariants(const Variants & variants, const Vector4 & def)
-	//!		{
-	//!			return variants.size() == 4 ? Vector4(variants[0], variants[1], variants[2], variants[3]) : def;
-	//!		}
-	//!		static inline Variants ToVariants(const Vector4 & value)
-	//!		{
-	//!			return { value[0], value[1], value[2], value[3] };
-	//!		}
-	//!	};
-	//!
-	//!	// then you can use Vector4 settings
-	//!	Settings::Instance().Set("some_vector", Vector4(0.0, 1.0, 2.0, 3.0));
-	//!
-	//! @endcode
-	//!
-	template< typename Type >
-	struct TypeTraits
-	{
-		//!
-		//! Convert from a list of variant to a concrete type.
-		//!
-		//! @param variants
-		//!		The list of variant.
-		//!
-		//! @param def
-		//!		Default value which should be returned in case the variants are not
-		//!		compatible with the given type.
-		//!
-		//! @return
-		//!		Either the value read from @p variants or @p def.
-		//!
-		static inline Type FromVariants(const Variants & variants, const Type & def)
-		{
-			return variants.size() == 1 ? static_cast< Type >(variants[0]) : def;
-		}
-
-		//!
-		//! Convert from a concrete type to a list of variant.
-		//!
-		//! @param value
-		//!		The value to convert to Variants
-		//!
-		//! @return
-		//!		The list of variant describing the value.
-		//!
-		static inline Variants ToVariants(const Type & value)
-		{
-			return { value };
-		}
-	};
-
-	//!
 	//! Load the settings
 	//!
 	inline void Load(void)
@@ -226,13 +165,13 @@ public:
 	//!
 	//! Templated read method.
 	//!
-	//! It uses TypeTraits to read from a settings variants list,
+	//! It uses VariantTypeTraits to read from a settings variants list,
 	//! so by default it supports types supported by Variants, and you can specialize
-	//! TypeTraits to add support to your custom types.
+	//! VariantTypeTraits to add support to your custom types.
 	//!
 	template< typename Type > inline Type Get(const std::string & name, const Type & def)
 	{
-		return m_Disabled == false ? TypeTraits< Type >::FromVariants(this->GetSetting(name).Values, def) : def;
+		return m_Disabled == false ? VariantTypeTraits< Type >::FromVariants(this->GetSetting(name).Values, def) : def;
 	}
 
 	//!
@@ -242,7 +181,7 @@ public:
 	//!
 	template< typename Type > inline void Set(const std::string & name, const Type & value)
 	{
-		this->Set(name, TypeTraits< Type >::ToVariants(value));
+		this->Set(name, VariantTypeTraits< Type >::ToVariants(value));
 	}
 
 private:
