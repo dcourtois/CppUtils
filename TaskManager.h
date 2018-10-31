@@ -37,8 +37,7 @@ public:
 	TaskManager(int threadCount = -1)
 		: m_State(State::Stopping)
 		, m_QueuedTaskCount(0)
-		, m_ThreadCount(0)
-		, m_PausedThreadCount(0)
+		, m_RunningThreadCount(0)
 	{
 		// init the threads
 		this->SetThreadCount(threadCount);
@@ -81,8 +80,7 @@ public:
 	//!
 	//! Push a new task. The task can be anything that is castable to
 	//! a `std::function< void (void *) >`. Implicit cast will work with
-	//! lambdas and static methods / functions, and you can bind a method
-	//! of an instance using `std::bind` explicitely.
+	//! lambdas and static methods / functions.
 	//!
 	//! The `void *` parameter passed to the task is a pointer to some
 	//! user data (use SetThreadLocalStorage to set this) that is shared
@@ -97,7 +95,7 @@ public:
 		}
 
 		// check if we have some threads
-		if (m_ThreadCount == 0)
+		if (m_Threads.empty() == 0)
 		{
 			// no jobs, just execute the task
 			task(m_ThreadLocalStorage.front());
@@ -107,7 +105,7 @@ public:
 			// push the job
 			{
 				std::lock_guard< std::mutex > lock(m_QueueMutex);
-				m_Queue.emplace(task);
+				m_Queue.emplace(std::move(task));
 				++m_QueuedTaskCount;
 			}
 
@@ -121,7 +119,7 @@ public:
 	//!
 	inline int GetThreadCount(void) const
 	{
-		return m_ThreadCount;
+		return static_cast< int >(m_Threads.size());
 	}
 
 	//!
@@ -148,7 +146,7 @@ public:
 		}
 
 		// do nothing if the number of threads is already correct
-		if (count == m_ThreadCount)
+		if (count == static_cast< int >(m_Threads.size()))
 		{
 			return;
 		}
@@ -157,12 +155,11 @@ public:
 		m_State = State::Stopping;
 
 		// clear the queue and wait until running ones are processed and join the threads
-		this->Cancel();
+		this->EmptyQueue();
 		this->JoinThreads();
 
 		// clear previous data and reserve space for new ones
-		m_PausedThreadCount = 0;
-		m_ThreadCount = count;
+		m_RunningThreadCount = count;
 		m_Threads.clear();
 		m_Threads.reserve(count);
 		m_ThreadLocalStorage.clear();
@@ -191,9 +188,9 @@ public:
 
 						// and wait for something to do
 						std::unique_lock< std::mutex > uniqueLock(m_ConditionVariableMutex);
-						++m_PausedThreadCount;
+						--m_RunningThreadCount;
 						m_ConditionVariable.wait(uniqueLock);
-						--m_PausedThreadCount;
+						++m_RunningThreadCount;
 					}
 					else
 					{
@@ -218,23 +215,26 @@ public:
 	//! Wait until there is no longer any task queued or running.
 	//! This will stall the current thread.
 	//!
-	inline void Wait(void)
+	//! @param us
+	//!		Number of micro seconds to wait between 2 checks.
+	//!
+	inline void Wait(uint64_t us = 1000)
 	{
-		while (m_PausedThreadCount < m_ThreadCount)
+		while (m_RunningThreadCount > 0)
 		{
-			std::this_thread::sleep_for(std::chrono::milliseconds(1));
+			std::this_thread::sleep_for(std::chrono::microseconds(us));
 		}
 	}
 
 	//!
-	//! Cancel every queued tasks and stalls the current thread until the currently
+	//! Cancel every queued tasks and stall the current thread until the currently
 	//! running ones are completed.
 	//!
-	inline void Cancel(void)
+	inline void Cancel(uint64_t us = 1000)
 	{
 		m_State = State::Paused;
 		this->EmptyQueue();
-		this->Wait();
+		this->Wait(us);
 		m_State = State::Running;
 	}
 
@@ -255,12 +255,14 @@ private:
 	}
 
 	//!
-	//! Join threads
+	//! Join threads.
 	//!
 	inline void JoinThreads(void)
 	{
+		assert(m_State == State::Stopping);
+
 		// no thread, easy
-		if (m_ThreadCount == 0)
+		if (m_Threads.empty() == true)
 		{
 			return;
 		}
@@ -314,11 +316,8 @@ private:
 	//! Number of tasks in the queue
 	std::atomic_int m_QueuedTaskCount;
 	
-	//! Number of threads
-	std::atomic_int m_ThreadCount;
-
-	//! Number of threads asleep
-	std::atomic_int m_PausedThreadCount;
+	//! Number of running threads
+	std::atomic_int m_RunningThreadCount;
 
 };
 
