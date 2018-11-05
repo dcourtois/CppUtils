@@ -89,5 +89,29 @@ inline void SleepForMs(int ms)
 	std::this_thread::sleep_for(std::chrono::milliseconds(ms));
 }
 
+//!
+//! Return a lowercase copy of the input string
+//!
+inline std::string ToLower(const std::string & string)
+{
+	std::string result(string.size(), 0);
+	std::transform(string.begin(), string.end(), result.begin(), [] (char c) {
+		return static_cast< char >(std::tolower(c));
+	});
+	return result;
+}
+
+//!
+//! Return an uppercase copy of the input string
+//!
+inline std::string ToUpper(const std::string & string)
+{
+	std::string result(string.size(), 0);
+	std::transform(string.begin(), string.end(), result.begin(), [] (char c) {
+		return static_cast< char >(std::toupper(c));
+	});
+	return result;
+}
+
 
 #endif // STL_UTILS_H
