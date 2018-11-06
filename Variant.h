@@ -36,8 +36,15 @@ public:
 	{
 	}
 
+	//! pointer constructor
+	template< typename T > inline Variant(const T * value)
+		: m_Type(Type::Void)
+		, m_Data(value)
+	{
+	}
+
 	//! string constructor
-	inline Variant(const char * value)
+	template<> inline Variant(const char * value)
 		: m_Type(Type::String)
 		, m_Data(value)
 	{
@@ -102,13 +109,6 @@ public:
 	//! bool constructor
 	inline Variant(bool value)
 		: m_Type(Type::Bool)
-		, m_Data(value)
-	{
-	}
-
-	//! pointer constructor
-	inline Variant(const void * value)
-		: m_Type(Type::Void)
 		, m_Data(value)
 	{
 	}
@@ -349,6 +349,13 @@ public:
 			case Type::Void:		return m_Data.v;
 			default:				return nullptr;
 		}
+	}
+
+	//! convert to a pointer type
+	template< typename T > inline T * ToPointer(void) const
+	{
+		assert(m_Type == Type::Void && "only Void type variants can be cast to a pointer type.");
+		return const_cast< T * >(reinterpret_cast< const T * >(m_Data.v));
 	}
 
 	//! serialize the variant to a binary stream
