@@ -95,7 +95,7 @@ public:
 		}
 
 		// check if we have some threads
-		if (m_Threads.empty() == 0)
+		if (m_Threads.empty() == true)
 		{
 			// no jobs, just execute the task
 			task(m_ThreadLocalStorage.front());
