@@ -43,7 +43,7 @@ public:
 	{
 	}
 
-	//! string constructor
+	//! string litteral constructor
 	template<> inline Variant(const char * value)
 		: m_Type(Type::String)
 		, m_Data(value)
@@ -207,11 +207,49 @@ public:
 	}
 
 	//! equality operator
+	inline bool operator == (const Variant & other) const
+	{
+		if (m_Type != other.m_Type)
+		{
+			return false;
+		}
+		switch (m_Type)
+		{
+			case Type::String:		return m_Data.s == other.m_Data.s;
+			case Type::Double:		return m_Data.d == other.m_Data.d;
+			case Type::Signed:		return m_Data.i == other.m_Data.i;
+			case Type::Unsigned:	return m_Data.ui == other.m_Data.ui;
+			case Type::Bool:		return m_Data.b == other.m_Data.b;
+			case Type::Void:		return m_Data.v == other.m_Data.v;
+			default:				return true;
+		}
+	}
+
+	//! equality operator
 	template< typename T > inline bool operator == (T other) const
 	{
 		return static_cast< T >(*this) == other;
 	}
 
+	//! inequality operator
+	inline bool operator != (const Variant & other) const
+	{
+		if (m_Type != other.m_Type)
+		{
+			return true;
+		}
+		switch (m_Type)
+		{
+			case Type::String:		return m_Data.s != other.m_Data.s;
+			case Type::Double:		return m_Data.d != other.m_Data.d;
+			case Type::Signed:		return m_Data.i != other.m_Data.i;
+			case Type::Unsigned:	return m_Data.ui != other.m_Data.ui;
+			case Type::Bool:		return m_Data.b != other.m_Data.b;
+			case Type::Void:		return m_Data.v != other.m_Data.v;
+			default:				return false;
+		}
+	}
+	
 	//! inequality operator
 	template< typename T > inline bool operator != (T other) const
 	{
@@ -593,6 +631,44 @@ template< typename T, typename ...Ts > inline Variants ToVariants(T first, Ts...
 		variants.push_back(std::move(variant));
 	}
 	return variants;
+}
+
+//!
+//! Helper to compare 2 lists of variants
+//!
+inline bool operator == (const Variants & left, const Variants & right)
+{
+	if (left.size() != right.size())
+	{
+		return false;
+	}
+	for (auto l = left.begin(), r = right.begin(), lend = left.end(), rend = right.end(); l != lend; ++l, ++r)
+	{
+		if (*l != *r)
+		{
+			return false;
+		}
+	}
+	return true;
+}
+
+//!
+//! Helper to compare 2 lists of variants
+//!
+inline bool operator != (const Variants & left, const Variants & right)
+{
+	if (left.size() != right.size())
+	{
+		return true;
+	}
+	for (auto l = left.begin(), r = right.begin(), lend = left.end(), rend = right.end(); l != lend; ++l, ++r)
+	{
+		if (*l != *r)
+		{
+			return true;
+		}
+	}
+	return false;
 }
 
 
