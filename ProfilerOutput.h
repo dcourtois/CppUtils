@@ -141,12 +141,10 @@ namespace Profiler
 			ScopedLock< Mutex > lockScopes(Data->ScopeMutex);
 
 			// open the output file
-			std::ofstream file(filename, std::ios::binary | std::ios::out);
+			std::ofstream file(filename);
 
 			// extract data from the markers
 			std::unordered_map< ThreadID, std::pair< TimePoint, TimePoint > > timeRanges;
-			TimePoint min = GetCurrentTime();
-			TimePoint max;
 			std::vector< uint64_t > inclusive(Data->Scopes.size(), 0);
 			std::vector< int64_t > exclusive(Data->Scopes.size(), 0);
 			std::vector< uint64_t > counts(Data->Scopes.size(), 0);
@@ -158,17 +156,13 @@ namespace Profiler
 					auto range = timeRanges.find(marker.Thread);
 					if (range == timeRanges.end())
 					{
-						timeRanges[marker.Thread] = std::make_pair(marker.Start, marker.End);
+						timeRanges[marker.Thread] = { marker.Start, marker.End };
 					}
 					else
 					{
 						range->second.first = std::min(range->second.first, marker.Start);
 						range->second.second = std::max(range->second.second, marker.End);
 					}
-
-					// global time range
-					min = std::min(min, marker.Start);
-					max = std::max(max, marker.End);
 
 					// update the exec times and counts
 					uint64_t ns = GetNanoSeconds(marker.Start, marker.End);
@@ -201,8 +195,8 @@ namespace Profiler
 						";" << GetReadableTime(exclusive[i]) <<
 						";" << GetReadableTime(inclusive[i] / counts[i]) <<
 						";" << GetReadableTime(exclusive[i] / counts[i]) <<
-						";" << GetDouble((100.0 * inclusive[i]) / double(execTime), 2) << " %" <<
-						";" << GetDouble((100.0 * exclusive[i]) / double(execTime), 2) << " %" <<
+						";" << GetDouble((100.0 * inclusive[i]) / double(execTime), 2) <<
+						";" << GetDouble((100.0 * exclusive[i]) / double(execTime), 2) <<
 						std::endl;
 				}
 			}
