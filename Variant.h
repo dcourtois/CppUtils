@@ -43,13 +43,6 @@ public:
 	{
 	}
 
-	//! string litteral constructor
-	template<> inline Variant(const char * value)
-		: m_Type(Type::String)
-		, m_Data(value)
-	{
-	}
-
 	//! string constructor
 	inline Variant(const std::string & value)
 		: m_Type(Type::String)
@@ -175,7 +168,7 @@ public:
 	}
 
 	//! assignment operator
-	inline Variant & operator = (const char * other)
+	template< typename T > inline Variant & operator = (const T * other)
 	{
 		this->~Variant();
 		new (this) Variant(other);
@@ -249,7 +242,7 @@ public:
 			default:				return false;
 		}
 	}
-	
+
 	//! inequality operator
 	template< typename T > inline bool operator != (T other) const
 	{
@@ -543,6 +536,18 @@ private:
 	} m_Data;
 
 };
+
+//!
+//! Specialization of the pointer constructor for strings.
+//!
+//! @note
+//!		Apparently this cannot be done inside the class scope.
+//!
+template<> inline Variant::Variant(const char * value)
+	: m_Type(Type::String)
+	, m_Data(value)
+{
+}
 
 
 //!
