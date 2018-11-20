@@ -35,27 +35,30 @@ namespace Hash
 	}
 
 	//!
+	//! Helper used by Combine
+	//!
+	constexpr uint32_t Rotl(uint32_t x, uint32_t r)
+	{
+		return (x << r) | (x >> (32 - r));
+	}
+
+	//!
 	//! Helper used to combine 2 hash keys.
 	//!
 	//! @note
 	//!		Implementation is based on Boost's hash_combine one.
 	//!
-	constexpr uint32_t Combine(uint32_t left, uint32_t right)
+	constexpr uint32_t Combine(uint32_t key, uint32_t hash)
 	{
-		return left ^ (right + 0x9e3779b9 + (left << 6) + (left >> 2));
+		return Rotl(key ^ (Rotl(hash * 0xcc9e2d51, 15) * 0x1b873593), 13) * 5 + 0xe6546b64;
 	}
 
 	//!
 	//! Helper to combine more than 2 values
 	//!
-	inline uint32_t Combine(std::initializer_list< uint32_t > hashes)
+	template< typename U, typename V, typename ...W > constexpr uint32_t Combine(U key, V hash, W... hashes)
 	{
-		assert(hashes.size() > 2);
-		unsigned int key = *hashes.begin();
-		for (auto i = hashes.begin() + 1, iend = hashes.end(); i != iend; ++i) {
-			key = Combine(key, *i);
-		}
-		return key;
+		return Combine(Combine(key, hash), hashes...);
 	}
 
 	//!
