@@ -23,6 +23,7 @@
 
 #include <unordered_map>
 #include <mutex>
+#include <cinttypes>
 
 
 //!
@@ -352,11 +353,11 @@ void operator delete [] (void * pointer) noexcept;
 	}																														\
 	else																													\
 	{																														\
-		log("Memory leak detected - %llu block%s still allocated :\n", chunks.size(), chunks.size() > 1 ? "s" : "");		\
+		log("Memory leak detected - %" PRIu64 " block%s still allocated :\n", chunks.size(), chunks.size() > 1 ? "s" : "");	\
 		for (const auto & entry : chunks)																					\
 		{																													\
 			log(																											\
-				"%s(%d): [%lli] %llu bytes at location %p\n",																\
+				"%s(%d): [%" PRId64 "] %" PRIu64 " bytes at location %p\n",													\
 				entry.second.Filename,																						\
 				entry.second.Line,																							\
 				entry.second.AllocationID,																					\
