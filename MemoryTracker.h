@@ -219,7 +219,7 @@ private:
 	MemoryTracker(void)
 		: m_AllocationCount(0)
 		, m_BreakOnAlloc(-1)
-		, m_Enabled(false)
+		, m_Enabled(true)
 	{
 	}
 
