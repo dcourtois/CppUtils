@@ -358,17 +358,17 @@ void operator delete [] (void * pointer) noexcept;
 		{																							\
 			size += entry.second.Bytes;																\
 		}																							\
-		log("Memory leak detected - %" PRIu64 " block%s (%" PRIu64 " byte%s) still allocated\n",	\
+		log("Memory leak detected - %" PRIu64 " block%s (%" PRIu64 " byte%s) still allocated:\n",	\
 			chunks.size(), chunks.size() > 1 ? "s" : "",											\
 			size, size > 1 ? "s" : ""																\
 		);																							\
 		for (const auto & entry : chunks)															\
 		{																							\
 			log(																					\
-				"%s:%d: [%" PRId64 "] %" PRIu64 " bytes at location %p\n",							\
+				"  [%" PRId64 "] - %s:%d - %" PRIu64 " bytes at location %p\n",						\
+				entry.second.AllocationID,															\
 				entry.second.Filename,																\
 				entry.second.Line,																	\
-				entry.second.AllocationID,															\
 				entry.second.Bytes,																	\
 				entry.first																			\
 			);																						\
