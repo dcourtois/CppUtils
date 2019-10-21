@@ -344,27 +344,35 @@ void operator delete [] (void * pointer) noexcept;
 //!		memory chunks allocated or not, and if there are, where the allocation was.
 //!		You just have to provide a @a log function that works like printf.
 //!
-#define MT_SHUTDOWN(log)																									\
-	MemoryTracker::Instance().SetEnabled(false);																			\
-	auto chunks = MemoryTracker::Instance().GetTrackedChunks();																\
-	if (chunks.empty() == true)																								\
-	{																														\
-		log("No memory leaks, congratulations !\n");																		\
-	}																														\
-	else																													\
-	{																														\
-		log("Memory leak detected - %" PRIu64 " block%s still allocated :\n", chunks.size(), chunks.size() > 1 ? "s" : "");	\
-		for (const auto & entry : chunks)																					\
-		{																													\
-			log(																											\
-				"%s(%d): [%" PRId64 "] %" PRIu64 " bytes at location %p\n",													\
-				entry.second.Filename,																						\
-				entry.second.Line,																							\
-				entry.second.AllocationID,																					\
-				entry.second.Bytes,																							\
-				entry.first																									\
-			);																												\
-		}																													\
+#define MT_SHUTDOWN(log)																			\
+	MemoryTracker::Instance().SetEnabled(false);													\
+	auto chunks = MemoryTracker::Instance().GetTrackedChunks();										\
+	if (chunks.empty() == true)																		\
+	{																								\
+		log("No memory leaks, congratulations !\n");												\
+	}																								\
+	else																							\
+	{																								\
+		size_t size = 0;																			\
+		for (const auto & entry : chunks)															\
+		{																							\
+			size += entry.second.Bytes;																\
+		}																							\
+		log("Memory leak detected - %" PRIu64 " block%s (%" PRIu64 " byte%s) still allocated\n",	\
+			chunks.size(), chunks.size() > 1 ? "s" : "",											\
+			size, size > 1 ? "s" : ""																\
+		);																							\
+		for (const auto & entry : chunks)															\
+		{																							\
+			log(																					\
+				"%s:%d: [%" PRId64 "] %" PRIu64 " bytes at location %p\n",							\
+				entry.second.Filename,																\
+				entry.second.Line,																	\
+				entry.second.AllocationID,															\
+				entry.second.Bytes,																	\
+				entry.first																			\
+			);																						\
+		}																							\
 	}
 
 
