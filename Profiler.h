@@ -6,7 +6,7 @@
 //! If not defined by the user, we will define it to 1
 //!
 #if !defined(PROFILER_ENABLE)
-#	define PROFILER_ENABLE 1
+#	define PROFILER_ENABLE 0
 #endif
 
 
