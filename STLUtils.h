@@ -1,6 +1,9 @@
 #ifndef STL_UTILS_H
 #define STL_UTILS_H
 
+#include <algorithm>
+#include <thread>
+
 
 //!
 //! Check if a container contains an item.
